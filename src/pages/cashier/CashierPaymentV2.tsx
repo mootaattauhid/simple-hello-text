@@ -96,12 +96,12 @@ const CashierPaymentV2 = () => {
               name
             )
           ),
-          profiles (
+          profiles!inner (
             full_name,
             phone
           )
         `)
-        .or(`profiles.full_name.ilike.%${searchTerm}%`)
+        .ilike('profiles.full_name', `%${searchTerm}%`)
         .eq('payment_status', 'pending')
         .order('created_at', { ascending: false });
 
