@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -107,7 +106,7 @@ const CashierPaymentV2 = () => {
 
       if (error) throw error;
 
-      setSearchResults(data || []);
+      setSearchResults(data as Order[] || []);
 
       if (!data || data.length === 0) {
         toast({
