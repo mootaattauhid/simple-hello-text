@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Dialog, 
@@ -48,7 +48,7 @@ interface OrderDetailData {
     full_name: string;
     phone: string;
     address: string;
-  };
+  } | null;
 }
 
 interface OrderDetailModalProps {
