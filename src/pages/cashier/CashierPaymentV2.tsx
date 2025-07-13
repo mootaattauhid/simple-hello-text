@@ -79,7 +79,8 @@ const CashierPaymentV2 = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // First get orders with pending payment status
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
           *,
@@ -94,26 +95,54 @@ const CashierPaymentV2 = () => {
             menu_items (
               name
             )
-          ),
-          profiles (
-            full_name,
-            phone
           )
         `)
         .not('user_id', 'is', null)
         .eq('payment_status', 'pending')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (ordersError) throw ordersError;
 
-      // Filter results by parent name on the client side
-      const filteredData = data?.filter(order => 
+      if (!ordersData || ordersData.length === 0) {
+        setSearchResults([]);
+        toast({
+          title: "Tidak Ditemukan",
+          description: "Tidak ada pesanan yang ditemukan",
+        });
+        return;
+      }
+
+      // Get user IDs from orders
+      const userIds = [...new Set(ordersData.map(order => order.user_id))];
+
+      // Get profiles for these users
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Create a map of profiles by user ID
+      const profilesMap = new Map();
+      profilesData?.forEach(profile => {
+        profilesMap.set(profile.id, profile);
+      });
+
+      // Combine orders with profiles and filter by parent name
+      const ordersWithProfiles = ordersData.map(order => ({
+        ...order,
+        profiles: profilesMap.get(order.user_id) || null
+      }));
+
+      // Filter by parent name
+      const filteredOrders = ordersWithProfiles.filter(order => 
         order.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-      ) || [];
+      );
 
-      setSearchResults(filteredData as Order[]);
+      setSearchResults(filteredOrders);
 
-      if (!filteredData || filteredData.length === 0) {
+      if (filteredOrders.length === 0) {
         toast({
           title: "Tidak Ditemukan",
           description: "Tidak ada pesanan yang ditemukan dengan nama tersebut",
