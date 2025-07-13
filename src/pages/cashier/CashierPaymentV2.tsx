@@ -113,7 +113,7 @@ const CashierPaymentV2 = () => {
       }
 
       // Get user IDs from orders
-      const userIds = [...new Set(ordersData.map(order => order.user_id))];
+      const userIds = [...new Set(ordersData.map(order => order.user_id).filter(Boolean))];
 
       // Get profiles for these users
       const { data: profilesData, error: profilesError } = await supabase
@@ -124,25 +124,27 @@ const CashierPaymentV2 = () => {
       if (profilesError) throw profilesError;
 
       // Create a map of profiles by user ID
-      const profilesMap = new Map();
+      const profilesMap = new Map<string, { full_name: string; phone: string }>();
       profilesData?.forEach(profile => {
-        profilesMap.set(profile.id, profile);
+        profilesMap.set(profile.id, {
+          full_name: profile.full_name || '',
+          phone: profile.phone || ''
+        });
       });
 
       // Combine orders with profiles and filter by parent name
-      const ordersWithProfiles = ordersData.map(order => ({
-        ...order,
-        profiles: profilesMap.get(order.user_id) || null
-      }));
+      const ordersWithProfiles: Order[] = ordersData
+        .map(order => ({
+          ...order,
+          profiles: profilesMap.get(order.user_id || '') || null
+        }))
+        .filter(order => 
+          order.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
 
-      // Filter by parent name
-      const filteredOrders = ordersWithProfiles.filter(order => 
-        order.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      setSearchResults(ordersWithProfiles);
 
-      setSearchResults(filteredOrders);
-
-      if (filteredOrders.length === 0) {
+      if (ordersWithProfiles.length === 0) {
         toast({
           title: "Tidak Ditemukan",
           description: "Tidak ada pesanan yang ditemukan dengan nama tersebut",
