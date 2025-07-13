@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -29,11 +30,13 @@ import ScheduleManagement from "./pages/admin/ScheduleManagement";
 import UserManagement from "./pages/admin/UserManagement";
 import PopulateDailyMenus from "./pages/admin/PopulateDailyMenus";
 import OrderRecap from "./pages/admin/OrderRecap";
+import OrderRecapV2 from "./pages/admin/OrderRecapV2";
 import Reports from "./pages/admin/Reports";
 
 // Cashier Pages
 import CashierDashboard from "./pages/cashier/CashierDashboard";
 import CashierReports from "./pages/cashier/CashierReports";
+import CashierPaymentV2 from "./pages/cashier/CashierPaymentV2";
 
 const queryClient = new QueryClient();
 
@@ -109,6 +112,7 @@ function AppRoutes() {
           <Route path="/admin/user-management" element={<UserManagement />} />
           <Route path="/admin/populate-daily-menus" element={<PopulateDailyMenus />} />
           <Route path="/admin/order-recap" element={<OrderRecap />} />
+          <Route path="/admin/order-recap-v2" element={<OrderRecapV2 />} />
           <Route path="/admin/reports" element={<Reports />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/orders/:orderId" element={<OrderDetail />} />
@@ -129,6 +133,7 @@ function AppRoutes() {
           <Route path="/" element={<CashierDashboard />} />
           <Route path="/cashier" element={<CashierDashboard />} />
           <Route path="/cashier/reports" element={<CashierReports />} />
+          <Route path="/cashier/payment-v2" element={<CashierPaymentV2 />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/orders/:orderId" element={<OrderDetail />} />
           <Route path="/auth" element={<Navigate to="/" replace />} />

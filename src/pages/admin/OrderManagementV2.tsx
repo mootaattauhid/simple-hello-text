@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getStatusColor, getStatusText, getPaymentStatusColor, getPaymentStatusText, formatPrice, formatDate } from '@/utils/orderUtils';
 import { usePagination } from '@/hooks/usePagination';
 import { PaginationControls } from '@/components/ui/pagination-controls';
+import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Filter, 
@@ -26,7 +26,8 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Eye
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -68,6 +69,7 @@ type OrderStatus = "pending" | "confirmed" | "preparing" | "ready" | "delivered"
 type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
 const OrderManagementV2 = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +92,6 @@ const OrderManagementV2 = () => {
     paidRevenue: 0
   });
 
-  // Pagination
   const {
     currentPage,
     totalPages,
@@ -305,6 +306,10 @@ const OrderManagementV2 = () => {
     window.URL.revokeObjectURL(url);
   };
 
+  const handleViewDetail = (orderId: string) => {
+    navigate(`/orders/${orderId}`);
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto p-6">
@@ -348,7 +353,6 @@ const OrderManagementV2 = () => {
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardContent className="p-4">
@@ -400,7 +404,6 @@ const OrderManagementV2 = () => {
         </div>
       </div>
 
-      {/* Filters */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -515,7 +518,6 @@ const OrderManagementV2 = () => {
         </CardContent>
       </Card>
 
-      {/* Bulk Actions */}
       {selectedOrders.length > 0 && (
         <Card className="mb-6">
           <CardHeader>
@@ -557,7 +559,6 @@ const OrderManagementV2 = () => {
         </Card>
       )}
 
-      {/* Selection Actions */}
       <Card className="mb-6">
         <CardContent className="pt-6">
           <div className="flex flex-wrap gap-2">
@@ -584,7 +585,6 @@ const OrderManagementV2 = () => {
         </CardContent>
       </Card>
 
-      {/* Orders Table */}
       <Card>
         <CardHeader>
           <CardTitle>Daftar Pesanan</CardTitle>
@@ -643,22 +643,32 @@ const OrderManagementV2 = () => {
                   </TableCell>
                   <TableCell>{formatDate(order.created_at)}</TableCell>
                   <TableCell>
-                    <Select
-                      value={order.status}
-                      onValueChange={(value: OrderStatus) => updateOrderStatus(order.id, value)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Menunggu</SelectItem>
-                        <SelectItem value="confirmed">Dikonfirmasi</SelectItem>
-                        <SelectItem value="preparing">Disiapkan</SelectItem>
-                        <SelectItem value="ready">Siap</SelectItem>
-                        <SelectItem value="delivered">Terkirim</SelectItem>
-                        <SelectItem value="cancelled">Dibatalkan</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDetail(order.id)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Detail
+                      </Button>
+                      <Select
+                        value={order.status}
+                        onValueChange={(value: OrderStatus) => updateOrderStatus(order.id, value)}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Menunggu</SelectItem>
+                          <SelectItem value="confirmed">Dikonfirmasi</SelectItem>
+                          <SelectItem value="preparing">Disiapkan</SelectItem>
+                          <SelectItem value="ready">Siap</SelectItem>
+                          <SelectItem value="delivered">Terkirim</SelectItem>
+                          <SelectItem value="cancelled">Dibatalkan</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -667,7 +677,6 @@ const OrderManagementV2 = () => {
         </CardContent>
       </Card>
 
-      {/* Pagination Controls */}
       <div className="mt-6">
         <PaginationControls
           currentPage={currentPage}

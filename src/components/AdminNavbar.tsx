@@ -16,7 +16,8 @@ import {
   X,
   FileText,
   BarChart3,
-  Package2
+  Package2,
+  ClipboardList
 } from 'lucide-react';
 
 const AdminNavbar = () => {
@@ -38,6 +39,7 @@ const AdminNavbar = () => {
     { to: '/admin/user-management', icon: Users, label: 'User' },
     { to: '/admin/populate-daily-menus', icon: Settings, label: 'Populate Menu' },
     { to: '/admin/order-recap', icon: FileText, label: 'Rekap Pesanan' },
+    { to: '/admin/order-recap-v2', icon: ClipboardList, label: 'Rekap V2' },
     { to: '/admin/reports', icon: BarChart3, label: 'Laporan' },
   ];
 
