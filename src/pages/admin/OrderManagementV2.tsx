@@ -39,6 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { OrderDetailModal } from '@/components/admin/OrderDetailModal';
 
 interface OrderItem {
   id: string;
@@ -91,6 +92,8 @@ const OrderManagementV2 = () => {
     totalRevenue: 0,
     paidRevenue: 0
   });
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   const {
     currentPage,
@@ -307,7 +310,13 @@ const OrderManagementV2 = () => {
   };
 
   const handleViewDetail = (orderId: string) => {
-    navigate(`/orders/${orderId}`);
+    setSelectedOrderId(orderId);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedOrderId(null);
   };
 
   if (loading) {
@@ -705,6 +714,12 @@ const OrderManagementV2 = () => {
           </CardContent>
         </Card>
       )}
+
+      <OrderDetailModal
+        orderId={selectedOrderId}
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseDetailModal}
+      />
     </div>
   );
 };
