@@ -29,6 +29,12 @@ interface OrderItem {
   } | null;
 }
 
+interface UserProfile {
+  full_name: string;
+  phone: string;
+  address: string;
+}
+
 interface OrderDetailData {
   id: string;
   order_number: string;
@@ -44,11 +50,6 @@ interface OrderDetailData {
   payment_method: string | null;
   user_id: string;
   order_line_items: OrderItem[];
-  profiles?: {
-    full_name: string;
-    phone: string;
-    address: string;
-  } | null;
 }
 
 interface OrderDetailModalProps {
@@ -59,6 +60,7 @@ interface OrderDetailModalProps {
 
 export const OrderDetailModal = ({ orderId, isOpen, onClose }: OrderDetailModalProps) => {
   const [order, setOrder] = useState<OrderDetailData | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -97,7 +99,9 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose }: OrderDetailModalP
 
       if (orderError) throw orderError;
 
-      // Fetch user profile
+      setOrder(orderData);
+
+      // Fetch user profile separately
       if (orderData.user_id) {
         const { data: profileData } = await supabase
           .from('profiles')
@@ -105,10 +109,8 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose }: OrderDetailModalP
           .eq('id', orderData.user_id)
           .single();
 
-        orderData.profiles = profileData;
+        setUserProfile(profileData);
       }
-
-      setOrder(orderData);
     } catch (error) {
       console.error('Error fetching order detail:', error);
     } finally {
@@ -182,17 +184,17 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose }: OrderDetailModalP
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Nama Orang Tua:</p>
-                    <p className="font-medium">{order.profiles?.full_name || 'N/A'}</p>
+                    <p className="font-medium">{userProfile?.full_name || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">No. Telepon:</p>
-                    <p className="font-medium">{order.profiles?.phone || 'N/A'}</p>
+                    <p className="font-medium">{userProfile?.phone || 'N/A'}</p>
                   </div>
                 </div>
-                {order.profiles?.address && (
+                {userProfile?.address && (
                   <div>
                     <p className="text-sm text-gray-600">Alamat:</p>
-                    <p className="font-medium">{order.profiles.address}</p>
+                    <p className="font-medium">{userProfile.address}</p>
                   </div>
                 )}
               </CardContent>
