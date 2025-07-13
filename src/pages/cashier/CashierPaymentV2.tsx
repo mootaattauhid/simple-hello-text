@@ -95,20 +95,25 @@ const CashierPaymentV2 = () => {
               name
             )
           ),
-          profiles!inner (
+          profiles (
             full_name,
             phone
           )
         `)
-        .ilike('profiles.full_name', `%${searchTerm}%`)
+        .not('user_id', 'is', null)
         .eq('payment_status', 'pending')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      setSearchResults(data as Order[] || []);
+      // Filter results by parent name on the client side
+      const filteredData = data?.filter(order => 
+        order.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      ) || [];
 
-      if (!data || data.length === 0) {
+      setSearchResults(filteredData as Order[]);
+
+      if (!filteredData || filteredData.length === 0) {
         toast({
           title: "Tidak Ditemukan",
           description: "Tidak ada pesanan yang ditemukan dengan nama tersebut",
