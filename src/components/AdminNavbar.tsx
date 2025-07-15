@@ -1,148 +1,182 @@
 
-import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { 
-  LayoutDashboard, 
-  UtensilsCrossed, 
-  ShoppingCart, 
-  Calendar,
-  Users,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  FileText,
-  BarChart3,
-  Package2,
-  ClipboardList
-} from 'lucide-react';
+import { useState } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { LayoutDashboard, Utensils, ShoppingBag, Calendar, FileText, LogOut, Menu, X, Plus, BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 const AdminNavbar = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/auth');
-  };
-
-  const navItems = [
-    { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/admin/food-management', icon: UtensilsCrossed, label: 'Kelola Menu' },
-    { to: '/admin/order-management', icon: ShoppingCart, label: 'Pesanan V1' },
-    { to: '/admin/order-management-v2', icon: Package2, label: 'Pesanan V2' },
-    { to: '/admin/schedule-management', icon: Calendar, label: 'Jadwal' },
-    { to: '/admin/user-management', icon: Users, label: 'User' },
-    { to: '/admin/populate-daily-menus', icon: Settings, label: 'Populate Menu' },
-    { to: '/admin/order-recap', icon: FileText, label: 'Rekap Pesanan' },
-    { to: '/admin/order-recap-v2', icon: ClipboardList, label: 'Rekap V2' },
-    { to: '/admin/reports', icon: BarChart3, label: 'Laporan' },
+  const navigationItems = [
+    {
+      name: "Dashboard",
+      href: "/admin",
+      icon: LayoutDashboard,
+    },
+    {
+      name: "Manajemen Menu",
+      href: "/admin/food-management",
+      icon: Utensils,
+    },
+    {
+      name: "Manajemen Pesanan",
+      href: "/admin/order-management",
+      icon: ShoppingBag,
+    },
+    {
+      name: "Jadwal & Kuota",
+      href: "/admin/schedule-management",
+      icon: Calendar,
+    },
+    {
+      name: "Populate Daily Menus",
+      href: "/admin/populate-daily-menus",
+      icon: Plus,
+    },
+    {
+      name: "Rekapitulasi",
+      href: "/admin/order-recap",
+      icon: BarChart3,
+    },
+    {
+      name: "Laporan",
+      href: "/admin/reports",
+      icon: FileText,
+    },
   ];
 
+  const isActiveRoute = (href: string) => {
+    if (href === "/admin") {
+      return location.pathname === "/admin";
+    }
+    return location.pathname.startsWith(href);
+  };
+
   return (
-    <nav className="bg-white shadow-lg border-b sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <h1 className="text-xl font-bold text-orange-600">Admin Panel</h1>
-            </div>
-            
-            {/* Desktop Navigation */}
-            <div className="hidden md:ml-8 md:flex md:space-x-1">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }`
-                  }
-                >
-                  <item.icon className="h-4 w-4 mr-2" />
-                  {item.label}
-                </NavLink>
-              ))}
-            </div>
-          </div>
+    <div className="sticky top-0 z-50 bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg">
+      <div className="container mx-auto px-2 md:px-4">
+        <div className="flex items-center justify-between h-14 md:h-16">
+          {/* Logo */}
+          <Link to="/admin" className="text-lg md:text-2xl font-bold truncate">
+            CateringKu Admin
+          </Link>
 
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600 hidden sm:block">
-              {user?.email}
-            </span>
-            <Button
-              onClick={handleSignOut}
-              variant="outline"
-              size="sm"
-              className="hidden sm:flex"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Keluar
-            </Button>
+          {/* Desktop Navigation */}
+          <nav className="hidden lg:flex items-center space-x-1">
+            {navigationItems.map((item) => (
+              <Link
+                key={item.name}
+                to={item.href}
+                className={cn(
+                  "flex items-center px-2 py-2 rounded-md text-xs font-medium transition-colors whitespace-nowrap",
+                  isActiveRoute(item.href)
+                    ? "bg-white/20 text-white"
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
+                )}
+              >
+                <item.icon className="h-3 w-3 mr-1" />
+                {item.name}
+              </Link>
+            ))}
+          </nav>
 
-            {/* Mobile menu button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="md:hidden"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              {isMobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </Button>
+          <div className="flex items-center space-x-2">
+            {/* Mobile Menu Button */}
+            <div className="lg:hidden">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="text-white hover:bg-white/10 p-2"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )}
+              </Button>
+            </div>
+
+            {/* User Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage 
+                      src={user?.user_metadata?.avatar_url || ""} 
+                      alt={user?.user_metadata?.full_name || "Admin"} 
+                    />
+                    <AvatarFallback>
+                      {user?.user_metadata?.full_name?.charAt(0).toUpperCase() || "A"}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end">
+                <DropdownMenuLabel>Admin Panel</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/")}>
+                  Kembali ke Aplikasi Utama
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => signOut()}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Keluar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 bg-white border-t">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `flex items-center px-3 py-2 rounded-md text-base font-medium ${
-                      isActive
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }`
-                  }
+          <div className="lg:hidden py-4 border-t border-white/20">
+            <nav className="space-y-2">
+              {navigationItems.map((item) => (
+                <Link
+                  key={item.name}
+                  to={item.href}
                   onClick={() => setIsMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    isActiveRoute(item.href)
+                      ? "bg-white/20 text-white"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
+                  )}
                 >
-                  <item.icon className="h-5 w-5 mr-3" />
-                  {item.label}
-                </NavLink>
+                  <item.icon className="h-4 w-4 mr-2" />
+                  {item.name}
+                </Link>
               ))}
-              <div className="border-t border-gray-200 pt-4">
-                <div className="px-3 py-2">
-                  <p className="text-sm text-gray-500">{user?.email}</p>
-                </div>
+              <div className="border-t border-white/20 pt-2 mt-2">
                 <Button
-                  onClick={handleSignOut}
-                  variant="outline"
-                  size="sm"
-                  className="mx-3 mt-2"
+                  variant="ghost"
+                  onClick={() => signOut()}
+                  className="w-full justify-start text-white/80 hover:bg-white/10 hover:text-white"
                 >
-                  <LogOut className="h-4 w-4 mr-2" />
+                  <LogOut className="mr-2 h-4 w-4" />
                   Keluar
                 </Button>
               </div>
-            </div>
+            </nav>
           </div>
         )}
       </div>
-    </nav>
+    </div>
   );
 };
 

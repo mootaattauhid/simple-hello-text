@@ -3,7 +3,31 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
-import { Order, OrderLineItem } from '@/types/order';
+
+interface OrderItem {
+  id: string;
+  quantity: number;
+  price: number;
+  menu_items: {
+    name: string;
+    image_url: string;
+  } | null;
+}
+
+interface Order {
+  id: string;
+  child_name: string | null;
+  child_class: string | null;
+  total_amount: number;
+  status: string | null;
+  payment_status: string | null;
+  created_at: string;
+  delivery_date: string | null;
+  notes: string | null;
+  midtrans_order_id: string | null;
+  snap_token: string | null;
+  order_items: OrderItem[];
+}
 
 export const useOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -22,21 +46,10 @@ export const useOrders = () => {
         .from('orders')
         .select(`
           *,
-          order_line_items (
+          order_items (
             id,
-            order_id,
-            child_id,
-            child_name,
-            child_class,
-            menu_item_id,
             quantity,
-            unit_price,
-            total_price,
-            delivery_date,
-            order_date,
-            notes,
-            created_at,
-            updated_at,
+            price,
             menu_items (
               name,
               image_url
@@ -51,7 +64,7 @@ export const useOrders = () => {
       // Transform the data to match our interface
       const transformedOrders = (data || []).map(order => ({
         ...order,
-        order_line_items: order.order_line_items.map((item: any) => ({
+        order_items: order.order_items.map(item => ({
           ...item,
           menu_items: item.menu_items || { name: 'Unknown Item', image_url: '' }
         }))
@@ -134,9 +147,9 @@ export const useOrders = () => {
         phone: user?.user_metadata?.phone || '08123456789',
       };
 
-      const itemDetails = order.order_line_items.map(item => ({
+      const itemDetails = order.order_items.map(item => ({
         id: item.id,
-        price: item.unit_price,
+        price: item.price,
         quantity: item.quantity,
         name: item.menu_items?.name || 'Unknown Item',
       }));

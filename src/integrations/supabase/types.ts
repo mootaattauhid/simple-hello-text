@@ -111,6 +111,8 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          nik: string | null
+          nis: string | null
           updated_at: string
           user_id: string
         }
@@ -119,6 +121,8 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          nik?: string | null
+          nis?: string | null
           updated_at?: string
           user_id: string
         }
@@ -127,8 +131,37 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          nik?: string | null
+          nis?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      classes: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -463,6 +496,36 @@ export type Database = {
           id?: string
           phone?: string | null
           role?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          class_name: string | null
+          created_at: string
+          id: string
+          name: string
+          nik: string
+          nis: string | null
+          updated_at: string
+        }
+        Insert: {
+          class_name?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          nik: string
+          nis?: string | null
+          updated_at?: string
+        }
+        Update: {
+          class_name?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          nik?: string
+          nis?: string | null
           updated_at?: string
         }
         Relationships: []
