@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, Utensils, ShoppingBag, Calendar, FileText, LogOut, Menu, X, Plus, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Utensils, ShoppingBag, Calendar, FileText, LogOut, Menu, X, Plus, BarChart3, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -56,6 +56,11 @@ const AdminNavbar = () => {
       name: "Laporan",
       href: "/admin/reports",
       icon: FileText,
+    },
+    {
+      name: "Kelola Siswa",
+      href: "/admin/student-management",
+      icon: GraduationCap,
     },
   ];
 

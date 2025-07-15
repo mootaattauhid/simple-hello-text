@@ -11,6 +11,7 @@ import {
   Plus,
   TrendingUp,
   UserCog,
+  GraduationCap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -49,6 +50,7 @@ export const Navbar = () => {
         { path: '/admin/schedule-management', label: 'Jadwal', icon: Calendar },
         { path: '/admin/populate-daily-menus', label: 'Isi Menu Harian', icon: Plus },
         { path: '/admin/user-management', label: 'Kelola Pengguna', icon: UserCog },
+        { path: '/admin/student-management', label: 'Kelola Siswa', icon: GraduationCap },
       ];
     } else if (userRole === 'cashier') {
       return [
