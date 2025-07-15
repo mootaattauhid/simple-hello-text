@@ -66,12 +66,12 @@ const StudentForm: React.FC<StudentFormProps> = ({ student, classes, onSubmit, o
       
       <div className="space-y-2">
         <Label htmlFor="className">Kelas</Label>
-        <Select name="className" defaultValue={student?.class_name || ''}>
+        <Select name="className" defaultValue={student?.class_name || 'no-class'}>
           <SelectTrigger>
             <SelectValue placeholder="Pilih kelas" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Tidak ada kelas</SelectItem>
+            <SelectItem value="no-class">Tidak ada kelas</SelectItem>
             {classes.map((cls) => (
               <SelectItem key={cls.id} value={cls.name}>
                 {cls.name} - {cls.description}

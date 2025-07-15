@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -86,6 +85,9 @@ const StudentManager = () => {
     const name = formData.get('name') as string;
     const className = formData.get('className') as string;
 
+    // Handle the "no-class" value
+    const processedClassName = className === 'no-class' ? null : className || null;
+
     try {
       if (editingStudent) {
         const { error } = await supabase
@@ -94,7 +96,7 @@ const StudentManager = () => {
             nik,
             nis: nis || null,
             name,
-            class_name: className || null,
+            class_name: processedClassName,
           })
           .eq('id', editingStudent.id);
 
@@ -110,7 +112,7 @@ const StudentManager = () => {
             nik,
             nis: nis || null,
             name,
-            class_name: className || null,
+            class_name: processedClassName,
           });
 
         if (error) throw error;
