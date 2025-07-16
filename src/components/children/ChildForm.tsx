@@ -93,11 +93,12 @@ const ChildForm: React.FC<ChildFormProps> = ({
       
       <div className="space-y-2">
         <Label htmlFor="className">Kelas *</Label>
-        <Select name="className" defaultValue={child?.class_name || selectedStudent?.class_name || ''}>
+        <Select name="className" defaultValue={child?.class_name || selectedStudent?.class_name || 'no-class'}>
           <SelectTrigger>
             <SelectValue placeholder="Pilih kelas" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="no-class">Tidak ada kelas</SelectItem>
             {classes.map((cls) => (
               <SelectItem key={cls.id} value={cls.name}>
                 {cls.name} {cls.description && `- ${cls.description}`}
@@ -108,14 +109,18 @@ const ChildForm: React.FC<ChildFormProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="nik">NIK</Label>
+        <Label htmlFor="nik">NIK *</Label>
         <Input
           id="nik"
           name="nik"
+          required
           maxLength={16}
+          pattern="[0-9]{16}"
           defaultValue={child?.nik || selectedStudent?.nik || ''}
-          placeholder="16 digit NIK (opsional)"
+          placeholder="16 digit NIK (wajib diisi)"
+          title="NIK harus berisi 16 digit angka"
         />
+        <p className="text-xs text-gray-500">NIK harus berisi tepat 16 digit angka</p>
       </div>
 
       <div className="space-y-2">

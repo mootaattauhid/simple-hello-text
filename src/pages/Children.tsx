@@ -142,6 +142,28 @@ const Children = () => {
     }
   };
 
+  const checkNikExists = async (nik: string, excludeChildId?: string) => {
+    try {
+      let query = supabase
+        .from('children')
+        .select('id')
+        .eq('user_id', user?.id)
+        .eq('nik', nik);
+
+      if (excludeChildId) {
+        query = query.neq('id', excludeChildId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data && data.length > 0;
+    } catch (error) {
+      console.error('Error checking NIK:', error);
+      return false;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -150,14 +172,38 @@ const Children = () => {
     const nik = formData.get('nik') as string;
     const nis = formData.get('nis') as string;
 
+    // Handle the "no-class" value
+    const processedClassName = className === 'no-class' ? null : className || null;
+
+    // Validate NIK format
+    if (!nik || nik.length !== 16 || !/^\d{16}$/.test(nik)) {
+      toast({
+        title: "Error",
+        description: "NIK harus berisi tepat 16 digit angka",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if NIK already exists for this user (except when editing the same child)
+    const nikExists = await checkNikExists(nik, editingChild?.id);
+    if (nikExists) {
+      toast({
+        title: "Error",
+        description: "NIK sudah digunakan untuk anak lain. Gunakan NIK yang berbeda.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       if (editingChild) {
         const { error } = await supabase
           .from('children')
           .update({
             name,
-            class_name: className,
-            nik: nik || null,
+            class_name: processedClassName,
+            nik,
             nis: nis || null,
           })
           .eq('id', editingChild.id);
@@ -173,8 +219,8 @@ const Children = () => {
           .insert({
             user_id: user?.id,
             name,
-            class_name: className,
-            nik: nik || null,
+            class_name: processedClassName,
+            nik,
             nis: nis || null,
           });
 
@@ -276,7 +322,7 @@ const Children = () => {
                 {editingChild ? 'Edit Data Anak' : 'Tambah Anak Baru'}
               </DialogTitle>
               <DialogDescription>
-                {editingChild ? 'Perbarui informasi anak' : 'Masukkan informasi anak atau cari berdasarkan NIK'}
+                {editingChild ? 'Perbarui informasi anak' : 'Masukkan informasi anak atau cari berdasarkan NIK. NIK wajib diisi.'}
               </DialogDescription>
             </DialogHeader>
             
