@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,7 @@ interface Order {
   child_class: string;
   total_amount: number;
   payment_status: string;
+  created_at: string;
   order_items: {
     quantity: number;
     price: number;
@@ -52,7 +52,6 @@ export const CashPaymentV2: React.FC<CashPaymentV2Props> = ({ onPaymentComplete,
   const [loading, setLoading] = useState(false);
   const [loadingStudents, setLoadingStudents] = useState(false);
 
-  // Fetch students for autocomplete
   const fetchStudents = async (search: string) => {
     if (search.length < 2) {
       setStudents([]);
@@ -81,7 +80,6 @@ export const CashPaymentV2: React.FC<CashPaymentV2Props> = ({ onPaymentComplete,
     }
   };
 
-  // Fetch orders for selected student
   const fetchOrdersForStudent = async (student: Student) => {
     try {
       const { data, error } = await supabase
