@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CashPayment } from '@/components/cashier/CashPayment';
+import { CashPaymentV2 } from '@/components/cashier/CashPaymentV2';
 import { formatPrice, formatDate } from '@/utils/orderUtils';
 import { usePagination } from '@/hooks/usePagination';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -47,6 +48,7 @@ const CashierDashboard = () => {
     cashPayments: 0
   });
   const [loading, setLoading] = useState(true);
+  const [paymentVersion, setPaymentVersion] = useState<'v1' | 'v2'>('v1');
 
   // Pagination untuk filtered orders
   const {
@@ -166,8 +168,14 @@ const CashierDashboard = () => {
 
   const handlePaymentComplete = () => {
     setSelectedOrder(null);
+    setPaymentVersion('v1');
     fetchOrders();
     fetchDailyStats();
+  };
+
+  const handleBackToList = () => {
+    setSelectedOrder(null);
+    setPaymentVersion('v1');
   };
 
   if (loading) {
@@ -185,15 +193,21 @@ const CashierDashboard = () => {
     );
   }
 
-  if (selectedOrder) {
+  if (selectedOrder && paymentVersion === 'v1') {
     return (
       <div className="max-w-2xl mx-auto p-6">
-        <div className="mb-6">
+        <div className="mb-6 flex justify-between items-center">
           <Button 
             onClick={() => setSelectedOrder(null)}
             variant="outline"
           >
             ← Kembali ke Daftar Pesanan
+          </Button>
+          <Button
+            onClick={() => setPaymentVersion('v2')}
+            variant="outline"
+          >
+            Gunakan Versi 2
           </Button>
         </div>
         <CashPayment 
@@ -204,13 +218,34 @@ const CashierDashboard = () => {
     );
   }
 
+  if (paymentVersion === 'v2') {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <CashPaymentV2 
+          onPaymentComplete={handlePaymentComplete}
+          onBack={handleBackToList}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-2">
-          Dashboard Kasir
-        </h1>
-        <p className="text-gray-600">Kelola pembayaran tunai dan transaksi</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-2">
+              Dashboard Kasir
+            </h1>
+            <p className="text-gray-600">Kelola pembayaran tunai dan transaksi</p>
+          </div>
+          <Button
+            onClick={() => setPaymentVersion('v2')}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Pembayaran V2
+          </Button>
+        </div>
       </div>
 
       {/* Daily Stats */}
@@ -333,13 +368,26 @@ const CashierDashboard = () => {
 
                 <div>
                   {order.payment_status === 'pending' ? (
-                    <Button
-                      onClick={() => setSelectedOrder(order)}
-                      className="w-full"
-                      size="lg"
-                    >
-                      Proses Pembayaran
-                    </Button>
+                    <div className="space-y-2">
+                      <Button
+                        onClick={() => setSelectedOrder(order)}
+                        className="w-full"
+                        size="lg"
+                      >
+                        Proses Pembayaran V1
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          setPaymentVersion('v2');
+                        }}
+                        variant="outline"
+                        className="w-full"
+                        size="lg"
+                      >
+                        Proses Pembayaran V2
+                      </Button>
+                    </div>
                   ) : (
                     <Button
                       variant="outline"
