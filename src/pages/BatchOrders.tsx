@@ -79,9 +79,12 @@ export default function BatchOrders() {
 
       console.log('BatchOrders: Calling create-batch-payment with:', requestBody);
 
-      // Create batch payment using edge function
+      // Create batch payment using edge function with proper auth header
       const { data, error } = await supabase.functions.invoke('create-batch-payment', {
-        body: requestBody
+        body: requestBody,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        }
       });
 
       console.log('BatchOrders: Edge function response:', { data, error });

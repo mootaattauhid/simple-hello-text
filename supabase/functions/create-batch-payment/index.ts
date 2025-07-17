@@ -1,6 +1,4 @@
 
-
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -30,7 +28,7 @@ serve(async (req) => {
     const { orderIds, batchId, totalAmount } = requestBody;
     console.log("Parsed request:", { orderIds, batchId, totalAmount, orderIdsType: typeof orderIds, orderIdsLength: orderIds?.length });
 
-    // Create Supabase client
+    // Create Supabase client with anon key first
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
@@ -42,15 +40,14 @@ serve(async (req) => {
       throw new Error("No authorization header provided");
     }
     
-    const token = authHeader.replace("Bearer ", "");
-    const { data, error: authError } = await supabaseClient.auth.getUser(token);
+    // Set the session for the client
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
     
     if (authError) {
       console.error("Auth error:", authError);
       throw new Error(`Authentication failed: ${authError.message}`);
     }
     
-    const user = data.user;
     if (!user) {
       throw new Error("User not authenticated");
     }
@@ -65,11 +62,18 @@ serve(async (req) => {
       throw new Error("Batch ID and total amount are required");
     }
 
-    // First, let's check what orders exist for this user
+    // Use service role key for database operations to bypass RLS
+    const supabaseService = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    // First, let's check what orders exist for this user using service role
     console.log("Checking all orders for user:", user.id);
-    const { data: allUserOrders, error: allOrdersError } = await supabaseClient
+    const { data: allUserOrders, error: allOrdersError } = await supabaseService
       .from('orders')
-      .select('id, payment_status, total_amount, child_name')
+      .select('id, payment_status, total_amount, child_name, user_id')
       .eq('user_id', user.id);
 
     if (allOrdersError) {
@@ -80,7 +84,7 @@ serve(async (req) => {
 
     // Now check the specific orders requested
     console.log("Checking specific orders with IDs:", orderIds);
-    const { data: requestedOrders, error: requestedOrdersError } = await supabaseClient
+    const { data: requestedOrders, error: requestedOrdersError } = await supabaseService
       .from('orders')
       .select('id, payment_status, total_amount, child_name, user_id')
       .in('id', orderIds);
@@ -92,7 +96,7 @@ serve(async (req) => {
     }
 
     // Verify all orders belong to the user and are pending payment
-    const { data: orders, error: ordersError } = await supabaseClient
+    const { data: orders, error: ordersError } = await supabaseService
       .from('orders')
       .select('*')
       .in('id', orderIds)
@@ -109,7 +113,7 @@ serve(async (req) => {
     
     if (!orders || orders.length === 0) {
       // Let's provide more specific error information
-      const { data: ordersWithDifferentStatus, error: statusError } = await supabaseClient
+      const { data: ordersWithDifferentStatus, error: statusError } = await supabaseService
         .from('orders')
         .select('id, payment_status, user_id')
         .in('id', orderIds);
@@ -220,13 +224,6 @@ serve(async (req) => {
       throw new Error("No snap token received from Midtrans");
     }
 
-    // Use service role key for database updates
-    const supabaseService = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
-
     // Update only the found orders with Midtrans data
     const { error: updateError } = await supabaseService
       .from('orders')
@@ -287,5 +284,3 @@ serve(async (req) => {
     });
   }
 });
-
-
