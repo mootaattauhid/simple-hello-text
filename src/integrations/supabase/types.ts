@@ -371,6 +371,7 @@ export type Database = {
           delivery_date: string | null
           id: string
           midtrans_order_id: string | null
+          midtrans_transaction_id: string | null
           notes: string | null
           order_date: string | null
           order_number: string
@@ -380,7 +381,6 @@ export type Database = {
           snap_token: string | null
           status: string | null
           total_amount: number
-          transaction_id: string | null
           updated_at: string
           user_id: string | null
         }
@@ -391,6 +391,7 @@ export type Database = {
           delivery_date?: string | null
           id?: string
           midtrans_order_id?: string | null
+          midtrans_transaction_id?: string | null
           notes?: string | null
           order_date?: string | null
           order_number: string
@@ -400,7 +401,6 @@ export type Database = {
           snap_token?: string | null
           status?: string | null
           total_amount: number
-          transaction_id?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -411,6 +411,7 @@ export type Database = {
           delivery_date?: string | null
           id?: string
           midtrans_order_id?: string | null
+          midtrans_transaction_id?: string | null
           notes?: string | null
           order_date?: string | null
           order_number?: string
@@ -420,7 +421,6 @@ export type Database = {
           snap_token?: string | null
           status?: string | null
           total_amount?: number
-          transaction_id?: string | null
           updated_at?: string
           user_id?: string | null
         }

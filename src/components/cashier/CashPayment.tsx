@@ -35,8 +35,9 @@ export const CashPayment: React.FC<CashPaymentProps> = ({ order, onPaymentComple
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const changeAmount = parseFloat(receivedAmount) - order.total_amount;
-  const isValidPayment = parseFloat(receivedAmount) >= order.total_amount;
+  const receivedAmountNumber = parseFloat(receivedAmount) || 0;
+  const changeAmount = receivedAmountNumber - order.total_amount;
+  const isValidPayment = receivedAmountNumber >= order.total_amount;
 
   const handlePayment = async () => {
     if (!isValidPayment) {
@@ -54,16 +55,24 @@ export const CashPayment: React.FC<CashPaymentProps> = ({ order, onPaymentComple
       // Generate transaction ID for cash payment
       const transactionId = `CASH-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      // Update order payment status
+      console.log('CashPayment: Processing payment for order:', order.id);
+
+      // Update order payment status and status
       const { error: orderError } = await supabase
         .from('orders')
         .update({ 
           payment_status: 'paid',
-          status: 'confirmed'
+          status: 'confirmed',
+          payment_method: 'cash'
         })
         .eq('id', order.id);
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error('CashPayment: Error updating order:', orderError);
+        throw orderError;
+      }
+
+      console.log('CashPayment: Order updated successfully');
 
       // Record cash payment in payments table
       const { error: paymentError } = await supabase
@@ -76,16 +85,44 @@ export const CashPayment: React.FC<CashPaymentProps> = ({ order, onPaymentComple
           transaction_id: transactionId
         });
 
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.error('CashPayment: Error recording payment:', paymentError);
+        throw paymentError;
+      }
+
+      console.log('CashPayment: Payment recorded successfully');
+
+      // Record cash payment details in cash_payments table
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        const { error: cashPaymentError } = await supabase
+          .from('cash_payments')
+          .insert({
+            order_id: order.id,
+            amount: order.total_amount,
+            received_amount: receivedAmountNumber,
+            change_amount: Math.max(0, changeAmount),
+            cashier_id: user.id,
+            notes: notes || null
+          });
+
+        if (cashPaymentError) {
+          console.error('CashPayment: Error recording cash payment details:', cashPaymentError);
+          // Don't throw error here as the main payment is already completed
+        } else {
+          console.log('CashPayment: Cash payment details recorded successfully');
+        }
+      }
 
       toast({
         title: "Pembayaran Berhasil",
-        description: "Pembayaran tunai telah diproses",
+        description: `Pembayaran tunai telah diproses. Kembalian: ${formatPrice(Math.max(0, changeAmount))}`,
       });
 
       onPaymentComplete();
     } catch (error) {
-      console.error('Error processing payment:', error);
+      console.error('CashPayment: Error processing payment:', error);
       toast({
         title: "Error",
         description: "Gagal memproses pembayaran",
@@ -146,11 +183,11 @@ export const CashPayment: React.FC<CashPaymentProps> = ({ order, onPaymentComple
               onChange={(e) => setReceivedAmount(e.target.value)}
               placeholder="Masukkan jumlah uang"
               min={order.total_amount}
-              step="0.01"
+              step="1000"
             />
           </div>
 
-          {receivedAmount && (
+          {receivedAmount && receivedAmountNumber > 0 && (
             <div className="p-4 bg-gray-50 rounded-lg">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Kembalian:</span>
