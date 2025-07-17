@@ -42,6 +42,8 @@ export const useOrders = () => {
 
   const fetchOrders = async () => {
     try {
+      console.log('useOrders: Fetching orders for user:', user?.id);
+      
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -59,7 +61,12 @@ export const useOrders = () => {
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('useOrders: Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('useOrders: Fetched orders:', data?.length || 0);
       
       // Transform the data to match our interface
       const transformedOrders = (data || []).map(order => ({
@@ -72,7 +79,7 @@ export const useOrders = () => {
       
       setOrders(transformedOrders);
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('useOrders: Error fetching orders:', error);
       toast({
         title: "Error",
         description: "Gagal memuat data pesanan",
@@ -85,13 +92,16 @@ export const useOrders = () => {
 
   const retryPayment = async (order: Order) => {
     try {
+      console.log('useOrders: Retry payment for order:', order.id, 'midtrans_order_id:', order.midtrans_order_id);
+      
       // If snap_token exists, use it directly
       if (order.snap_token) {
-        console.log('Using existing snap_token:', order.snap_token);
+        console.log('useOrders: Using existing snap_token:', order.snap_token);
         
         if (window.snap) {
           window.snap.pay(order.snap_token, {
             onSuccess: () => {
+              console.log('useOrders: Payment success');
               toast({
                 title: "Pembayaran Berhasil!",
                 description: "Pembayaran berhasil diproses.",
@@ -99,6 +109,7 @@ export const useOrders = () => {
               fetchOrders();
             },
             onPending: () => {
+              console.log('useOrders: Payment pending');
               toast({
                 title: "Menunggu Pembayaran",
                 description: "Pembayaran sedang diproses.",
@@ -106,6 +117,7 @@ export const useOrders = () => {
               fetchOrders();
             },
             onError: () => {
+              console.log('useOrders: Payment error');
               toast({
                 title: "Pembayaran Gagal",
                 description: "Terjadi kesalahan dalam pembayaran.",
@@ -113,7 +125,7 @@ export const useOrders = () => {
               });
             },
             onClose: () => {
-              console.log('Payment popup closed');
+              console.log('useOrders: Payment popup closed');
             }
           });
         } else {
@@ -129,6 +141,8 @@ export const useOrders = () => {
         // Generate new order ID only if doesn't exist
         orderId = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
+        console.log('useOrders: Generated new midtrans_order_id:', orderId);
+        
         // Update order with new midtrans_order_id
         const { error: updateError } = await supabase
           .from('orders')
@@ -136,7 +150,7 @@ export const useOrders = () => {
           .eq('id', order.id);
           
         if (updateError) {
-          console.error('Error updating order:', updateError);
+          console.error('useOrders: Error updating order:', updateError);
           throw updateError;
         }
       }
@@ -154,7 +168,7 @@ export const useOrders = () => {
         name: item.menu_items?.name || 'Unknown Item',
       }));
 
-      console.log('Calling create-payment for new snap_token:', {
+      console.log('useOrders: Calling create-payment with:', {
         orderId,
         amount: order.total_amount,
         customerDetails,
@@ -174,9 +188,11 @@ export const useOrders = () => {
       );
 
       if (paymentError) {
-        console.error('Payment error:', paymentError);
+        console.error('useOrders: Payment creation error:', paymentError);
         throw paymentError;
       }
+
+      console.log('useOrders: Payment response:', paymentData);
 
       if (paymentData.snap_token) {
         // Save snap_token to database for future use
@@ -186,12 +202,13 @@ export const useOrders = () => {
           .eq('id', order.id);
 
         if (saveTokenError) {
-          console.error('Error saving snap_token:', saveTokenError);
+          console.error('useOrders: Error saving snap_token:', saveTokenError);
         }
 
         if (window.snap) {
           window.snap.pay(paymentData.snap_token, {
             onSuccess: () => {
+              console.log('useOrders: Payment success');
               toast({
                 title: "Pembayaran Berhasil!",
                 description: "Pembayaran berhasil diproses.",
@@ -199,6 +216,7 @@ export const useOrders = () => {
               fetchOrders();
             },
             onPending: () => {
+              console.log('useOrders: Payment pending');
               toast({
                 title: "Menunggu Pembayaran",
                 description: "Pembayaran sedang diproses.",
@@ -206,6 +224,7 @@ export const useOrders = () => {
               fetchOrders();
             },
             onError: () => {
+              console.log('useOrders: Payment error');
               toast({
                 title: "Pembayaran Gagal",
                 description: "Terjadi kesalahan dalam pembayaran.",
@@ -213,7 +232,7 @@ export const useOrders = () => {
               });
             },
             onClose: () => {
-              console.log('Payment popup closed');
+              console.log('useOrders: Payment popup closed');
             }
           });
         } else {
@@ -223,7 +242,7 @@ export const useOrders = () => {
         throw new Error('Snap token tidak diterima');
       }
     } catch (error: any) {
-      console.error('Retry payment error:', error);
+      console.error('useOrders: Retry payment error:', error);
       toast({
         title: "Error",
         description: error.message || "Gagal memproses pembayaran",
