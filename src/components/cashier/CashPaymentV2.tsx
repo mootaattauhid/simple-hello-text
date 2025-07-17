@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -169,14 +170,14 @@ export const CashPaymentV2: React.FC<CashPaymentV2Props> = ({ onPaymentComplete,
 
       if (orderError) throw orderError;
 
-      // Record cash payment in payments table
+      // Record cash payment in payments table - using 'success' instead of 'completed'
       const { error: paymentError } = await supabase
         .from('payments')
         .insert({
           order_id: selectedOrder.id,
           amount: selectedOrder.total_amount,
           payment_method: 'cash',
-          status: 'completed',
+          status: 'success',
           transaction_id: transactionId
         });
 
