@@ -105,12 +105,21 @@ const Orders = () => {
       orders: selectedOrders
     });
 
-    navigate('/batch-orders', { 
-      state: { 
-        selectedOrderIds, 
-        orders: selectedOrders 
-      } 
-    });
+    try {
+      navigate('/batch-orders', { 
+        state: { 
+          selectedOrderIds, 
+          orders: selectedOrders 
+        } 
+      });
+    } catch (error) {
+      console.error('Orders: Navigation error:', error);
+      toast({
+        title: "Error",
+        description: "Gagal navigasi ke halaman pembayaran batch",
+        variant: "destructive",
+      });
+    }
   };
 
   // Pagination
