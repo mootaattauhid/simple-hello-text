@@ -1,110 +1,99 @@
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { PrintButton } from '@/components/ui/print-button';
-import { OrderRecapPrint } from '@/components/print/OrderRecapPrint';
-import { OrderRecapV2 } from '@/components/admin/OrderRecapV2';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon, Filter, X, Download } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { formatPrice, formatDate } from '@/utils/orderUtils';
-import { usePagination } from '@/hooks/usePagination';
-import { PaginationControls } from '@/components/ui/pagination-controls';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Filter, X, BarChart3 } from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-interface OrderRecapData {
+interface RecapData {
+  date: string;
+  total_orders: number;
+  total_amount: number;
+  paid_orders: number;
+  pending_orders: number;
+  total_items: number;
+}
+
+interface DetailedOrder {
   id: string;
   child_name: string;
   child_class: string;
   total_amount: number;
-  created_at: string;
+  payment_status: string;
   delivery_date: string;
   order_items: {
-    id: string;
     quantity: number;
-    price: number;
-    menu_items: {
-      name: string;
-    };
+    menu_items: { name: string } | null;
   }[];
 }
 
-const OrderRecap = () => {
-  const [orders, setOrders] = useState<OrderRecapData[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<OrderRecapData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [groupedMenuItems, setGroupedMenuItems] = useState<{ name: string; quantity: number; totalPrice: number }[]>([]);
-  const [ordersByDate, setOrdersByDate] = useState<Record<string, OrderRecapData[]>>({});
-  const [ordersByClass, setOrdersByClass] = useState<Record<string, OrderRecapData[]>>({});
+interface OrderRecapProps {
+  onExportData?: (data: any[]) => void;
+}
+
+export const OrderRecap = ({ onExportData }: OrderRecapProps) => {
+  const [recapData, setRecapData] = useState<RecapData[]>([]);
+  const [detailedOrders, setDetailedOrders] = useState<DetailedOrder[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+  
+  // Filter states
+  const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string>('all');
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
-  const [recapV2Data, setRecapV2Data] = useState<any[]>([]);
-
-  const pagination = usePagination({
-    data: filteredOrders,
-    itemsPerPage: 10
-  });
 
   useEffect(() => {
-    fetchOrderRecap();
+    fetchClasses();
+    fetchData();
   }, []);
 
   useEffect(() => {
-    applyDateFilter();
-  }, [orders, startDate, endDate]);
+    fetchData();
+  }, [selectedClass, selectedPaymentStatus, startDate, endDate]);
 
-  const applyDateFilter = () => {
-    let filtered = [...orders];
-    
-    if (startDate) {
-      filtered = filtered.filter(order => {
-        if (!order.delivery_date) return false;
-        const deliveryDate = new Date(order.delivery_date);
-        const startOfDay = new Date(startDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        return deliveryDate >= startOfDay;
-      });
-    }
-    
-    if (endDate) {
-      filtered = filtered.filter(order => {
-        if (!order.delivery_date) return false;
-        const deliveryDate = new Date(order.delivery_date);
-        const endOfDay = new Date(endDate);
-        endOfDay.setHours(23, 59, 59, 999);
-        return deliveryDate <= endOfDay;
-      });
-    }
-    
-    setFilteredOrders(filtered);
-    processOrderData(filtered);
-  };
-
-  const clearDateFilter = () => {
-    setStartDate(undefined);
-    setEndDate(undefined);
-  };
-
-  const fetchOrderRecap = async () => {
+  const fetchClasses = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: classesData, error } = await supabase
+        .from('classes')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setClasses(classesData || []);
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+      toast({
+        title: "Error",
+        description: "Gagal memuat data kelas",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Build query with delivery_date filters
+      let query = supabase
         .from('orders')
         .select(`
           id,
           child_name,
           child_class,
           total_amount,
-          created_at,
+          payment_status,
           delivery_date,
           order_items (
-            id,
             quantity,
-            price,
             menu_items (
               name
             )
@@ -113,15 +102,80 @@ const OrderRecap = () => {
         .not('delivery_date', 'is', null)
         .order('delivery_date', { ascending: false });
 
+      // Apply class filter
+      if (selectedClass !== 'all') {
+        query = query.eq('child_class', selectedClass);
+      }
+
+      // Apply payment status filter
+      if (selectedPaymentStatus !== 'all') {
+        query = query.eq('payment_status', selectedPaymentStatus);
+      }
+
+      // Apply delivery date filters (using delivery_date, not created_at)
+      if (startDate) {
+        const startOfDay = new Date(startDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        query = query.gte('delivery_date', startOfDay.toISOString().split('T')[0]);
+      }
+
+      if (endDate) {
+        const endOfDay = new Date(endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        query = query.lte('delivery_date', endOfDay.toISOString().split('T')[0]);
+      }
+
+      const { data: ordersData, error } = await query;
+
       if (error) throw error;
+
+      setDetailedOrders(ordersData || []);
+
+      // Group by delivery_date for recap
+      const recapMap = new Map<string, RecapData>();
       
-      setOrders(data || []);
-      processOrderData(data || []);
+      ordersData?.forEach(order => {
+        const date = order.delivery_date;
+        const totalItems = order.order_items.reduce((sum, item) => sum + item.quantity, 0);
+        
+        if (!recapMap.has(date)) {
+          recapMap.set(date, {
+            date,
+            total_orders: 0,
+            total_amount: 0,
+            paid_orders: 0,
+            pending_orders: 0,
+            total_items: 0,
+          });
+        }
+        
+        const recap = recapMap.get(date)!;
+        recap.total_orders += 1;
+        recap.total_amount += order.total_amount;
+        recap.total_items += totalItems;
+        
+        if (order.payment_status === 'paid') {
+          recap.paid_orders += 1;
+        } else {
+          recap.pending_orders += 1;
+        }
+      });
+
+      const recapArray = Array.from(recapMap.values()).sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      
+      setRecapData(recapArray);
+      
+      // Call export callback if provided
+      if (onExportData) {
+        onExportData(recapArray);
+      }
     } catch (error) {
-      console.error('Error fetching order recap:', error);
+      console.error('Error fetching recap data:', error);
       toast({
         title: "Error",
-        description: "Gagal memuat rekap pesanan",
+        description: "Gagal memuat data rekapitulasi",
         variant: "destructive",
       });
     } finally {
@@ -129,718 +183,307 @@ const OrderRecap = () => {
     }
   };
 
-  const processOrderData = (orderData: OrderRecapData[]) => {
-    // Process grouped menu items
-    const allMenuItems = orderData.flatMap(order => 
-      order.order_items.map(item => ({
-        name: item.menu_items.name,
-        quantity: item.quantity,
-        price: item.price
-      }))
-    );
-
-    const grouped = allMenuItems.reduce((acc, item) => {
-      const existing = acc.find(i => i.name === item.name);
-      if (existing) {
-        existing.quantity += item.quantity;
-        existing.totalPrice += item.price * item.quantity;
-      } else {
-        acc.push({
-          name: item.name,
-          quantity: item.quantity,
-          totalPrice: item.price * item.quantity
-        });
-      }
-      return acc;
-    }, [] as { name: string; quantity: number; totalPrice: number }[]);
-
-    setGroupedMenuItems(grouped);
-
-    // Process orders by delivery date
-    const byDate = orderData.reduce((acc, order) => {
-      const date = order.delivery_date ? formatDate(order.delivery_date) : 'Tanpa Tanggal';
-      if (!acc[date]) {
-        acc[date] = [];
-      }
-      acc[date].push(order);
-      return acc;
-    }, {} as Record<string, OrderRecapData[]>);
-
-    setOrdersByDate(byDate);
-
-    // Process orders by class
-    const byClass = orderData.reduce((acc, order) => {
-      if (!acc[order.child_class]) {
-        acc[order.child_class] = [];
-      }
-      acc[order.child_class].push(order);
-      return acc;
-    }, {} as Record<string, OrderRecapData[]>);
-
-    setOrdersByClass(byClass);
+  const clearFilters = () => {
+    setSelectedClass('all');
+    setSelectedPaymentStatus('all');
+    setStartDate(undefined);
+    setEndDate(undefined);
   };
 
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(generatePrintHTML());
-      printWindow.document.close();
-      
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 500);
+  const hasActiveFilters = selectedClass !== 'all' || selectedPaymentStatus !== 'all' || startDate || endDate;
+
+  const getPaymentStatusLabel = (status: string) => {
+    switch (status) {
+      case 'paid': return 'Lunas';
+      case 'pending': return 'Belum Bayar';
+      case 'failed': return 'Gagal';
+      case 'refunded': return 'Refund';
+      default: return status;
     }
   };
 
-  const generatePrintHTML = () => {
-    // Use filtered orders for print
-    const dataToUse = filteredOrders.length > 0 ? filteredOrders : orders;
-    
-    // Combine all menu items without class separation
-    const allMenuItems = dataToUse.flatMap(order => 
-      order.order_items.map(item => ({
-        name: item.menu_items.name,
-        quantity: item.quantity,
-        price: item.price
-      }))
-    );
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid': return 'text-green-600 bg-green-50';
+      case 'pending': return 'text-yellow-600 bg-yellow-50';
+      case 'failed': return 'text-red-600 bg-red-50';
+      case 'refunded': return 'text-gray-600 bg-gray-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
+  };
 
-    const groupedMenuItems = allMenuItems.reduce((acc, item) => {
-      const existing = acc.find(i => i.name === item.name);
-      if (existing) {
-        existing.quantity += item.quantity;
-        existing.totalPrice += item.price * item.quantity;
-      } else {
-        acc.push({
-          name: item.name,
-          quantity: item.quantity,
-          totalPrice: item.price * item.quantity
-        });
-      }
-      return acc;
-    }, [] as { name: string; quantity: number; totalPrice: number }[]);
-
-    const ordersByClass = dataToUse.reduce((acc, order) => {
-      if (!acc[order.child_class]) {
-        acc[order.child_class] = [];
-      }
-      acc[order.child_class].push(order);
-      return acc;
-    }, {} as Record<string, OrderRecapData[]>);
-
-    const filterInfo = (startDate || endDate) ? 
-      `<p style="color: #666;">Filter Tanggal Katering: ${startDate ? format(startDate, "dd/MM/yyyy") : 'Semua'} - ${endDate ? format(endDate, "dd/MM/yyyy") : 'Semua'}</p>` : 
-      '';
-
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Rekapitulasi Pesanan</title>
-          <style>
-            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-            .print-content { padding: 20px; }
-            table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-            th { background-color: #f5f5f5; font-weight: bold; }
-            .text-center { text-align: center; }
-            .text-right { text-align: right; }
-            .bg-gray-50 { background-color: #f9f9f9; }
-            @media print {
-              body { print-color-adjust: exact; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="print-content">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">REKAPITULASI PESANAN</h1>
-              <p style="color: #666;">Tanggal: ${formatDate(new Date().toISOString())}</p>
-              ${filterInfo}
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Rekapitulasi Pesanan (Berdasarkan Tanggal Katering)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+            {/* Class Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Kelas</label>
+              <Select value={selectedClass} onValueChange={setSelectedClass}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua Kelas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Kelas</SelectItem>
+                  {classes.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.name}>
+                      {cls.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div style="margin-bottom: 30px;">
-              <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Rekapitulasi Menu (Gabungan Semua Kelas)</h2>
-              <table>
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Nama Menu</th>
-                    <th style="text-align: center;">Jumlah</th>
-                    <th style="text-align: right;">Total Harga</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${groupedMenuItems.map((item, index) => `
-                    <tr>
-                      <td>${index + 1}</td>
-                      <td>${item.name}</td>
-                      <td style="text-align: center;">${item.quantity}</td>
-                      <td style="text-align: right;">${formatPrice(item.totalPrice)}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-                <tfoot>
-                  <tr class="bg-gray-50" style="font-weight: bold;">
-                    <td colspan="2" style="text-align: right;">Total:</td>
-                    <td style="text-align: center;">${groupedMenuItems.reduce((sum, item) => sum + item.quantity, 0)}</td>
-                    <td style="text-align: right;">${formatPrice(groupedMenuItems.reduce((sum, item) => sum + item.totalPrice, 0))}</td>
-                  </tr>
-                </tfoot>
-              </table>
+            {/* Payment Status Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Status Pembayaran</label>
+              <Select value={selectedPaymentStatus} onValueChange={setSelectedPaymentStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Status</SelectItem>
+                  <SelectItem value="paid">Lunas</SelectItem>
+                  <SelectItem value="pending">Belum Bayar</SelectItem>
+                  <SelectItem value="failed">Gagal</SelectItem>
+                  <SelectItem value="refunded">Refund</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div>
-              <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Rekapitulasi Menu per Kelas</h2>
-              <table>
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Kelas</th>
-                    <th>Nama Menu</th>
-                    <th style="text-align: center;">Jumlah</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${Object.entries(ordersByClass).flatMap(([className, classOrders], classIndex) => {
-                    const classMenuItems = classOrders.flatMap(order => 
-                      order.order_items.map(item => ({
-                        name: item.menu_items.name,
-                        quantity: item.quantity
-                      }))
-                    );
-
-                    const groupedClassItems = classMenuItems.reduce((acc, item) => {
-                      const existing = acc.find(i => i.name === item.name);
-                      if (existing) {
-                        existing.quantity += item.quantity;
-                      } else {
-                        acc.push({ name: item.name, quantity: item.quantity });
-                      }
-                      return acc;
-                    }, [] as { name: string; quantity: number }[]);
-
-                    return groupedClassItems.map((item, itemIndex) => `
-                      <tr>
-                        <td>${Object.keys(ordersByClass).slice(0, classIndex).reduce((sum, key) => {
-                          const prevClassItems = ordersByClass[key].flatMap(order => 
-                            order.order_items.map(item => item.menu_items.name)
-                          );
-                          const uniquePrevItems = [...new Set(prevClassItems)];
-                          return sum + uniquePrevItems.length;
-                        }, 0) + itemIndex + 1}</td>
-                        <td>${className}</td>
-                        <td>${item.name}</td>
-                        <td style="text-align: center;">${item.quantity}</td>
-                      </tr>
-                    `).join('');
-                  }).join('')}
-                </tbody>
-              </table>
+            {/* Start Date Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tanggal Katering Mulai</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !startDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, "dd/MM/yyyy") : <span>Pilih tanggal</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={setStartDate}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
-            <div style="margin-top: 30px; text-align: center; font-size: 12px; color: #666;">
-              <p>Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
+            {/* End Date Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tanggal Katering Akhir</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !endDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {endDate ? format(endDate, "dd/MM/yyyy") : <span>Pilih tanggal</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={endDate}
+                    onSelect={setEndDate}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
-        </body>
-      </html>
-    `;
-  };
 
-  const handleRecapV2Export = (data: any[]) => {
-    setRecapV2Data(data);
-  };
-
-  const generateRecapV2PrintHTML = () => {
-    if (recapV2Data.length === 0) return '';
-
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Rekapitulasi Pesanan v2</title>
-          <style>
-            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-            .print-content { padding: 20px; }
-            table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-            th { background-color: #f5f5f5; font-weight: bold; }
-            .text-center { text-align: center; }
-            .text-right { text-align: right; }
-            .bg-gray-50 { background-color: #f9f9f9; }
-            @media print {
-              body { print-color-adjust: exact; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="print-content">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">REKAPITULASI PESANAN v2</h1>
-              <p style="color: #666;">Detail Per Siswa</p>
-              <p style="color: #666;">Tanggal: ${formatDate(new Date().toISOString())}</p>
+          {/* Clear Filters Button */}
+          {hasActiveFilters && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                onClick={clearFilters}
+                className="flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Hapus Semua Filter
+              </Button>
             </div>
+          )}
 
-            <table>
+          {/* Filter Summary */}
+          {hasActiveFilters && (
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-700">
+                Menampilkan data
+                {selectedClass !== 'all' && ` untuk kelas ${selectedClass}`}
+                {selectedPaymentStatus !== 'all' && ` dengan status ${getPaymentStatusLabel(selectedPaymentStatus)}`}
+                {startDate && ` dari tanggal katering ${format(startDate, "dd/MM/yyyy")}`}
+                {endDate && ` sampai ${format(endDate, "dd/MM/yyyy")}`}
+              </p>
+            </div>
+          )}
+
+          {/* Recap Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse border border-gray-300">
               <thead>
-                <tr>
-                  <th>No</th>
-                  <th>Nama Siswa</th>
-                  <th>Kelas</th>
-                  <th>Nama Menu</th>
-                  <th style="text-align: center;">Quantity</th>
-                  <th>Status Bayar</th>
-                  <th>Tanggal Katering</th>
+                <tr className="bg-gray-50">
+                  <th className="border border-gray-300 px-4 py-2 text-left">Tanggal Katering</th>
+                  <th className="border border-gray-300 px-4 py-2 text-center">Total Pesanan</th>
+                  <th className="border border-gray-300 px-4 py-2 text-center">Total Item</th>
+                  <th className="border border-gray-300 px-4 py-2 text-center">Lunas</th>
+                  <th className="border border-gray-300 px-4 py-2 text-center">Belum Bayar</th>
+                  <th className="border border-gray-300 px-4 py-2 text-right">Total Pendapatan</th>
                 </tr>
               </thead>
               <tbody>
-                ${recapV2Data.map((item, index) => `
+                {loading ? (
                   <tr>
-                    <td>${index + 1}</td>
-                    <td>${item.child_name}</td>
-                    <td>${item.child_class}</td>
-                    <td>${item.menu_name}</td>
-                    <td style="text-align: center;">${item.quantity}</td>
-                    <td>${item.payment_status === 'paid' ? 'Lunas' : item.payment_status === 'pending' ? 'Belum Bayar' : item.payment_status}</td>
-                    <td>${item.delivery_date ? formatDate(item.delivery_date) : 'Tidak ada'}</td>
+                    <td colSpan={6} className="border border-gray-300 px-4 py-8 text-center">
+                      <div className="animate-pulse">Memuat data...</div>
+                    </td>
                   </tr>
-                `).join('')}
+                ) : recapData.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="border border-gray-300 px-4 py-8 text-center">
+                      <div className="text-gray-500">
+                        Tidak ada data yang sesuai dengan filter
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  recapData.map((item) => (
+                    <tr key={item.date} className="hover:bg-gray-50">
+                      <td className="border border-gray-300 px-4 py-2 font-medium">
+                        {format(new Date(item.date), "dd MMMM yyyy")}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2 text-center">
+                        {item.total_orders}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2 text-center">
+                        {item.total_items}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2 text-center text-green-600">
+                        {item.paid_orders}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2 text-center text-yellow-600">
+                        {item.pending_orders}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2 text-right font-medium">
+                        {formatPrice(item.total_amount)}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
-
-            <div style="margin-top: 30px;">
-              <h3>Ringkasan:</h3>
-              <p>Total Item: ${recapV2Data.length}</p>
-              <p>Total Quantity: ${recapV2Data.reduce((sum, item) => sum + item.quantity, 0)}</p>
-              <p>Jumlah Siswa: ${new Set(recapV2Data.map(item => item.child_name)).size}</p>
-            </div>
-
-            <div style="margin-top: 30px; text-align: center; font-size: 12px; color: #666;">
-              <p>Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
-            </div>
           </div>
-        </body>
-      </html>
-    `;
-  };
 
-  const handleRecapV2Print = () => {
-    const printHTML = generateRecapV2PrintHTML();
-    if (!printHTML) {
-      toast({
-        title: "Error",
-        description: "Tidak ada data untuk dicetak",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printHTML);
-      printWindow.document.close();
-      
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 500);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-8 flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent mb-2">
-            Rekap Pesanan
-          </h1>
-          <p className="text-gray-600">Ringkasan pesanan berdasarkan tanggal katering</p>
-        </div>
-        <div className="flex gap-4 items-center">
-          <PrintButton onPrint={handlePrint} />
-        </div>
-      </div>
-
-      <Tabs defaultValue="recap-v1" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="recap-v1" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Rekapitulasi v1 (Ringkasan)
-          </TabsTrigger>
-          <TabsTrigger value="recap-v2" className="flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            Rekapitulasi v2 (Detail Per Siswa)
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="recap-v1" className="space-y-6">
-          {/* Date Filter */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Filter Tanggal Katering
-              </CardTitle>
-              <CardDescription>
-                Filter berdasarkan tanggal pengantaran katering
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-4 items-center">
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">Tanggal Katering Mulai</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-[240px] justify-start text-left font-normal",
-                          !startDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {startDate ? format(startDate, "dd/MM/yyyy") : <span>Pilih tanggal</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={startDate}
-                        onSelect={setStartDate}
-                        initialFocus
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
+          {/* Summary Cards */}
+          {recapData.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {recapData.reduce((sum, item) => sum + item.total_orders, 0)}
                 </div>
-                
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">Tanggal Katering Akhir</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-[240px] justify-start text-left font-normal",
-                          !endDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {endDate ? format(endDate, "dd/MM/yyyy") : <span>Pilih tanggal</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={endDate}
-                        onSelect={setEndDate}
-                        initialFocus
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
+                <div className="text-sm text-blue-600">Total Pesanan</div>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {recapData.reduce((sum, item) => sum + item.paid_orders, 0)}
                 </div>
-                
-                {(startDate || endDate) && (
-                  <Button
-                    variant="outline"
-                    onClick={clearDateFilter}
-                    className="flex items-center gap-2 mt-6"
-                  >
-                    <X className="h-4 w-4" />
-                    Hapus Filter
-                  </Button>
-                )}
+                <div className="text-sm text-green-600">Pesanan Lunas</div>
               </div>
-              
-              {(startDate || endDate) && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-700">
-                    Menampilkan {filteredOrders.length} pesanan dengan tanggal katering
-                    {startDate && ` dari ${format(startDate, "dd/MM/yyyy")}`}
-                    {endDate && ` sampai ${format(endDate, "dd/MM/yyyy")}`}
-                  </p>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {formatPrice(recapData.reduce((sum, item) => sum + item.total_amount, 0))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Rekapitulasi Menu (Gabungan) */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Rekapitulasi Menu (Gabungan Semua Kelas)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse border border-gray-300">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="border border-gray-300 px-4 py-2 text-left">No</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left">Nama Menu</th>
-                      <th className="border border-gray-300 px-4 py-2 text-center">Jumlah</th>
-                      <th className="border border-gray-300 px-4 py-2 text-right">Total Harga</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groupedMenuItems.map((item, index) => (
-                      <tr key={item.name}>
-                        <td className="border border-gray-300 px-4 py-2">{index + 1}</td>
-                        <td className="border border-gray-300 px-4 py-2">{item.name}</td>
-                        <td className="border border-gray-300 px-4 py-2 text-center">{item.quantity}</td>
-                        <td className="border border-gray-300 px-4 py-2 text-right">{formatPrice(item.totalPrice)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-gray-100 font-bold">
-                      <td className="border border-gray-300 px-4 py-2" colSpan={2}>Total:</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center">
-                        {groupedMenuItems.reduce((sum, item) => sum + item.quantity, 0)}
-                      </td>
-                      <td className="border border-gray-300 px-4 py-2 text-right">
-                        {formatPrice(groupedMenuItems.reduce((sum, item) => sum + item.totalPrice, 0))}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                <div className="text-sm text-purple-600">Total Pendapatan</div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Rekapitulasi per Tanggal Katering */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Rekapitulasi per Tanggal Katering</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(ordersByDate).map(([date, dateOrders]) => {
-                  const dateMenuItems = dateOrders.flatMap(order => 
-                    order.order_items.map(item => ({
-                      name: item.menu_items.name,
-                      quantity: item.quantity,
-                      price: item.price
-                    }))
-                  );
-
-                  const groupedDateItems = dateMenuItems.reduce((acc, item) => {
-                    const existing = acc.find(i => i.name === item.name);
-                    if (existing) {
-                      existing.quantity += item.quantity;
-                      existing.totalPrice += item.price * item.quantity;
-                    } else {
-                      acc.push({
-                        name: item.name,
-                        quantity: item.quantity,
-                        totalPrice: item.price * item.quantity
-                      });
-                    }
-                    return acc;
-                  }, [] as { name: string; quantity: number; totalPrice: number }[]);
-
-                  return (
-                    <div key={date} className="border rounded-lg p-4">
-                      <h3 className="font-bold text-lg mb-3">Tanggal Katering: {date}</h3>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full border-collapse border border-gray-300">
-                          <thead>
-                            <tr className="bg-gray-50">
-                              <th className="border border-gray-300 px-4 py-2 text-left">Nama Menu</th>
-                              <th className="border border-gray-300 px-4 py-2 text-center">Jumlah</th>
-                              <th className="border border-gray-300 px-4 py-2 text-right">Total Harga</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {groupedDateItems.map((item) => (
-                              <tr key={item.name}>
-                                <td className="border border-gray-300 px-4 py-2">{item.name}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-center">{item.quantity}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-right">{formatPrice(item.totalPrice)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="bg-gray-100 font-bold">
-                              <td className="border border-gray-300 px-4 py-2">Total:</td>
-                              <td className="border border-gray-300 px-4 py-2 text-center">
-                                {groupedDateItems.reduce((sum, item) => sum + item.quantity, 0)}
-                              </td>
-                              <td className="border border-gray-300 px-4 py-2 text-right">
-                                {formatPrice(groupedDateItems.reduce((sum, item) => sum + item.totalPrice, 0))}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Rekapitulasi per Kelas */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Rekapitulasi per Kelas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(ordersByClass).map(([className, classOrders]) => {
-                  const classMenuItems = classOrders.flatMap(order => 
-                    order.order_items.map(item => ({
-                      name: item.menu_items.name,
-                      quantity: item.quantity,
-                      price: item.price
-                    }))
-                  );
-
-                  const groupedClassItems = classMenuItems.reduce((acc, item) => {
-                    const existing = acc.find(i => i.name === item.name);
-                    if (existing) {
-                      existing.quantity += item.quantity;
-                      existing.totalPrice += item.price * item.quantity;
-                    } else {
-                      acc.push({
-                        name: item.name,
-                        quantity: item.quantity,
-                        totalPrice: item.price * item.quantity
-                      });
-                    }
-                    return acc;
-                  }, [] as { name: string; quantity: number; totalPrice: number }[]);
-
-                  return (
-                    <div key={className} className="border rounded-lg p-4">
-                      <h3 className="font-bold text-lg mb-3">Kelas {className}</h3>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full border-collapse border border-gray-300">
-                          <thead>
-                            <tr className="bg-gray-50">
-                              <th className="border border-gray-300 px-4 py-2 text-left">Nama Menu</th>
-                              <th className="border border-gray-300 px-4 py-2 text-center">Jumlah</th>
-                              <th className="border border-gray-300 px-4 py-2 text-right">Total Harga</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {groupedClassItems.map((item) => (
-                              <tr key={item.name}>
-                                <td className="border border-gray-300 px-4 py-2">{item.name}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-center">{item.quantity}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-right">{formatPrice(item.totalPrice)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="bg-gray-100 font-bold">
-                              <td className="border border-gray-300 px-4 py-2">Total:</td>
-                              <td className="border border-gray-300 px-4 py-2 text-center">
-                                {groupedClassItems.reduce((sum, item) => sum + item.quantity, 0)}
-                              </td>
-                              <td className="border border-gray-300 px-4 py-2 text-right">
-                                {formatPrice(groupedClassItems.reduce((sum, item) => sum + item.totalPrice, 0))}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Detail Pesanan Individual</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {pagination.paginatedData.map((order) => (
-                  <Card key={order.id}>
-                    <CardHeader>
-                      <CardTitle>{order.child_name}</CardTitle>
-                      <CardDescription>
-                        Kelas {order.child_class} • Katering: {order.delivery_date ? formatDate(order.delivery_date) : 'Belum dijadwalkan'}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {order.order_items.map((item) => (
-                          <div key={item.id} className="flex justify-between">
-                            <span>{item.menu_items.name} x{item.quantity}</span>
-                            <span>{formatPrice(item.price * item.quantity)}</span>
-                          </div>
-                        ))}
-                        <div className="border-t pt-2 font-bold">
-                          Total: {formatPrice(order.total_amount)}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              
-              <PaginationControls
-                currentPage={pagination.currentPage}
-                totalPages={pagination.totalPages}
-                onPageChange={pagination.goToPage}
-                canGoNext={pagination.canGoNext}
-                canGoPrev={pagination.canGoPrev}
-                startIndex={pagination.startIndex}
-                endIndex={pagination.endIndex}
-                totalItems={pagination.totalItems}
-                itemLabel="pesanan"
-              />
-            </CardContent>
-          </Card>
-
-          {orders.length === 0 && (
-            <Card className="text-center py-12">
-              <CardContent>
-                <h3 className="text-lg font-medium mb-2">Belum Ada Pesanan</h3>
-                <p className="text-gray-600">Belum ada pesanan yang masuk</p>
-              </CardContent>
-            </Card>
+            </div>
           )}
-        </TabsContent>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="recap-v2" className="space-y-6">
-          <div className="flex justify-end">
-            <Button
-              onClick={handleRecapV2Print}
-              variant="outline"
-              className="flex items-center gap-2"
-              disabled={recapV2Data.length === 0}
-            >
-              <CalendarIcon className="h-4 w-4" />
-              Print Rekapitulasi v2
-            </Button>
-          </div>
-          
-          <OrderRecapV2 onExportData={handleRecapV2Export} />
-        </TabsContent>
-      </Tabs>
+      {/* Detailed Orders */}
+      {detailedOrders.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Detail Pesanan</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="border border-gray-300 px-4 py-2 text-left">Nama Siswa</th>
+                    <th className="border border-gray-300 px-4 py-2 text-left">Kelas</th>
+                    <th className="border border-gray-300 px-4 py-2 text-left">Tanggal Katering</th>
+                    <th className="border border-gray-300 px-4 py-2 text-left">Detail Pesanan</th>
+                    <th className="border border-gray-300 px-4 py-2 text-center">Status Bayar</th>
+                    <th className="border border-gray-300 px-4 py-2 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detailedOrders.map((order) => (
+                    <tr key={order.id} className="hover:bg-gray-50">
+                      <td className="border border-gray-300 px-4 py-2 font-medium">
+                        {order.child_name}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        {order.child_class}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        {format(new Date(order.delivery_date), "dd/MM/yyyy")}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        <div className="space-y-1">
+                          {order.order_items.map((item, index) => (
+                            <div key={index} className="text-sm">
+                              {item.quantity}x {item.menu_items?.name || 'Unknown Item'}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2 text-center">
+                        <span className={cn(
+                          "px-2 py-1 rounded-full text-xs font-medium",
+                          getPaymentStatusColor(order.payment_status)
+                        )}>
+                          {getPaymentStatusLabel(order.payment_status)}
+                        </span>
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2 text-right font-medium">
+                        {formatPrice(order.total_amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
-
-export default OrderRecap;
