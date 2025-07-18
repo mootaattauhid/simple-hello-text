@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -243,13 +244,13 @@ export const OrderRecap = ({ onExportData }: OrderRecapProps) => {
     setShowDetailPrint(true);
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (showRecapPrint) {
       setShowRecapPrint(false);
     }
   }, [showRecapPrint]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (showDetailPrint) {
       setShowDetailPrint(false);
     }

@@ -27,12 +27,14 @@ export const DetailOrdersPrint: React.FC<DetailOrdersPrintProps> = ({
     standard: {
       fontSize: '12px',
       pageWidth: '210mm',
-      margin: '20mm'
+      margin: '20mm',
+      fontFamily: 'Arial, sans-serif'
     },
     thermal: {
       fontSize: '9px',
       pageWidth: '80mm',
-      margin: '3mm'
+      margin: '3mm',
+      fontFamily: 'Arial, sans-serif'
     },
     dotmatrix: {
       fontSize: '8px',
@@ -72,7 +74,7 @@ export const DetailOrdersPrint: React.FC<DetailOrdersPrintProps> = ({
               margin: ${currentStyle.margin};
             }
             body {
-              font-family: ${currentStyle.fontFamily || 'Arial, sans-serif'};
+              font-family: ${currentStyle.fontFamily};
               font-size: ${currentStyle.fontSize};
               line-height: 1.3;
             }

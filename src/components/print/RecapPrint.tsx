@@ -20,12 +20,14 @@ export const RecapPrint: React.FC<RecapPrintProps> = ({ data, printerType = 'sta
     standard: {
       fontSize: '12px',
       pageWidth: '210mm',
-      margin: '20mm'
+      margin: '20mm',
+      fontFamily: 'Arial, sans-serif'
     },
     thermal: {
       fontSize: '10px',
       pageWidth: '80mm',
-      margin: '5mm'
+      margin: '5mm',
+      fontFamily: 'Arial, sans-serif'
     },
     dotmatrix: {
       fontSize: '9px',
@@ -56,7 +58,7 @@ export const RecapPrint: React.FC<RecapPrintProps> = ({ data, printerType = 'sta
               margin: ${currentStyle.margin};
             }
             body {
-              font-family: ${currentStyle.fontFamily || 'Arial, sans-serif'};
+              font-family: ${currentStyle.fontFamily};
               font-size: ${currentStyle.fontSize};
               line-height: 1.4;
             }
