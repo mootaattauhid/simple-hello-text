@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, User, Calendar, Package, CreditCard, Clock } from 'lucide-react';
+import { Search, User, Calendar, Package, CreditCard, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { formatPrice, formatDate } from '@/utils/orderUtils';
@@ -34,6 +34,7 @@ export default function CashierDashboard() {
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (searchTerm.length >= 2) {
@@ -68,6 +69,7 @@ export default function CashierDashboard() {
         `)
         .or(`child_name.ilike.%${searchTerm}%,child_class.ilike.%${searchTerm}%`)
         .not('child_name', 'is', null)
+        .not('delivery_date', 'is', null)
         .order('delivery_date', { ascending: false })
         .limit(20);
 
@@ -77,6 +79,8 @@ export default function CashierDashboard() {
       }
 
       console.log('CashierDashboard: Found orders:', data?.length || 0);
+      console.log('CashierDashboard: Order details:', data);
+      
       setOrders(data || []);
       setFilteredOrders(data || []);
     } catch (error) {
@@ -101,6 +105,16 @@ export default function CashierDashboard() {
       title: "Pembayaran Berhasil",
       description: "Pembayaran tunai telah diproses",
     });
+  };
+
+  const toggleOrderExpansion = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+    }
+    setExpandedOrders(newExpanded);
   };
 
   const getPaymentStatusColor = (status: string) => {
@@ -206,6 +220,7 @@ export default function CashierDashboard() {
               {filteredOrders.map((order) => {
                 const isExpired = isOrderExpired(order.delivery_date);
                 const canPay = order.payment_status === 'pending' && !isExpired;
+                const isExpanded = expandedOrders.has(order.id);
                 
                 return (
                   <div 
@@ -246,17 +261,35 @@ export default function CashierDashboard() {
                         <div className="flex items-center gap-2">
                           <Package className="h-4 w-4 text-gray-500" />
                           <span className="text-sm">Detail Pesanan</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleOrderExpansion(order.id)}
+                            className="h-6 w-6 p-0"
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
                         </div>
                         <div className="space-y-1">
-                          {order.order_items.slice(0, 2).map((item, index) => (
-                            <div key={index} className="text-sm">
-                              {item.quantity}x {item.menu_items?.name || 'Unknown Item'}
-                            </div>
-                          ))}
-                          {order.order_items.length > 2 && (
-                            <div className="text-xs text-gray-500">
-                              +{order.order_items.length - 2} item lainnya
-                            </div>
+                          {order.order_items && order.order_items.length > 0 ? (
+                            <>
+                              {(isExpanded ? order.order_items : order.order_items.slice(0, 2)).map((item, index) => (
+                                <div key={index} className="text-sm">
+                                  {item.quantity}x {item.menu_items?.name || 'Unknown Item'}
+                                </div>
+                              ))}
+                              {!isExpanded && order.order_items.length > 2 && (
+                                <div className="text-xs text-gray-500">
+                                  +{order.order_items.length - 2} item lainnya
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-sm text-gray-500">Tidak ada item</div>
                           )}
                         </div>
                       </div>
@@ -299,9 +332,29 @@ export default function CashierDashboard() {
                     <div className="mt-3 pt-3 border-t text-xs text-gray-500">
                       <div className="flex justify-between">
                         <span>Dibuat: {format(new Date(order.created_at), "dd/MM/yyyy HH:mm")}</span>
-                        <span>Total Item: {order.order_items.reduce((sum, item) => sum + item.quantity, 0)}</span>
+                        <span>Total Item: {order.order_items?.reduce((sum, item) => sum + item.quantity, 0) || 0}</span>
                       </div>
                     </div>
+
+                    {/* Expanded Order Details */}
+                    {isExpanded && order.order_items && order.order_items.length > 0 && (
+                      <div className="mt-3 pt-3 border-t">
+                        <h4 className="font-medium text-sm mb-2">Detail Lengkap Pesanan:</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {order.order_items.map((item, index) => (
+                            <div key={index} className="bg-gray-50 p-2 rounded text-sm">
+                              <div className="flex justify-between">
+                                <span>{item.menu_items?.name || 'Unknown Item'}</span>
+                                <span>{item.quantity}x</span>
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                @ {formatPrice(item.price)} = {formatPrice(item.price * item.quantity)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

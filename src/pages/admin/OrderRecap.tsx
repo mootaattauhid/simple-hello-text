@@ -1,16 +1,18 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Filter, X, Download } from 'lucide-react';
+import { CalendarIcon, Filter, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { formatPrice, formatDate } from '@/utils/orderUtils';
+import { PrintButton } from '@/components/ui/print-button';
+import { RecapPrint } from '@/components/print/RecapPrint';
+import { DetailOrdersPrint } from '@/components/print/DetailOrdersPrint';
 
 interface RecapData {
   date: string;
@@ -43,6 +45,9 @@ export const OrderRecap = ({ onExportData }: OrderRecapProps) => {
   const [detailedOrders, setDetailedOrders] = useState<DetailedOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+  const [showRecapPrint, setShowRecapPrint] = useState(false);
+  const [showDetailPrint, setShowDetailPrint] = useState(false);
+  const [printType, setPrintType] = useState<string>('standard');
   
   // Filter states
   const [selectedClass, setSelectedClass] = useState<string>('all');
@@ -212,14 +217,61 @@ export const OrderRecap = ({ onExportData }: OrderRecapProps) => {
     }
   };
 
+  const handleRecapPrint = (printerType = 'standard') => {
+    if (recapData.length === 0) {
+      toast({
+        title: "Tidak ada data",
+        description: "Tidak ada data rekapitulasi untuk dicetak",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPrintType(printerType);
+    setShowRecapPrint(true);
+  };
+
+  const handleDetailPrint = (printerType = 'standard') => {
+    if (detailedOrders.length === 0) {
+      toast({
+        title: "Tidak ada data",
+        description: "Tidak ada data detail pesanan untuk dicetak",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPrintType(printerType);
+    setShowDetailPrint(true);
+  };
+
+  React.useEffect(() => {
+    if (showRecapPrint) {
+      setShowRecapPrint(false);
+    }
+  }, [showRecapPrint]);
+
+  React.useEffect(() => {
+    if (showDetailPrint) {
+      setShowDetailPrint(false);
+    }
+  }, [showDetailPrint]);
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Rekapitulasi Pesanan (Berdasarkan Tanggal Katering)
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Rekapitulasi Pesanan (Berdasarkan Tanggal Katering)
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <PrintButton
+                onPrint={handleRecapPrint}
+                label="Print Rekapitulasi"
+                showPrinterOptions={true}
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Filters */}
@@ -429,7 +481,14 @@ export const OrderRecap = ({ onExportData }: OrderRecapProps) => {
       {detailedOrders.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Detail Pesanan</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Detail Pesanan</CardTitle>
+              <PrintButton
+                onPrint={handleDetailPrint}
+                label="Print Detail Pesanan"
+                showPrinterOptions={true}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -483,6 +542,15 @@ export const OrderRecap = ({ onExportData }: OrderRecapProps) => {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Print Components */}
+      {showRecapPrint && (
+        <RecapPrint data={recapData} printerType={printType} />
+      )}
+      
+      {showDetailPrint && (
+        <DetailOrdersPrint data={detailedOrders} printerType={printType} />
       )}
     </div>
   );
