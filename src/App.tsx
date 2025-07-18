@@ -11,7 +11,7 @@ import Auth from '@/pages/Auth';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import FoodManagement from '@/pages/admin/FoodManagement';
 import OrderManagement from '@/pages/admin/OrderManagement';
-import OrderRecap from '@/pages/admin/OrderRecap';
+import { OrderRecap } from '@/pages/admin/OrderRecap';
 import Reports from '@/pages/admin/Reports';
 import ScheduleManagement from '@/pages/admin/ScheduleManagement';
 import PopulateDailyMenus from '@/pages/admin/PopulateDailyMenus';
