@@ -89,3 +89,26 @@ export const filterOrdersByStatus = (orders: any[], status: string) => {
   if (status === 'all') return orders;
   return orders.filter(order => order.status === status);
 };
+
+export const isOrderExpired = (deliveryDate: string | null): boolean => {
+  if (!deliveryDate) return false;
+  
+  const delivery = new Date(deliveryDate);
+  const today = new Date();
+  
+  // Set time to start of day for accurate comparison
+  delivery.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  
+  return delivery < today;
+};
+
+export const canPayOrder = (order: { payment_status: string; delivery_date: string | null }): boolean => {
+  // Can't pay if already paid
+  if (order.payment_status === 'paid') return false;
+  
+  // Can't pay if order is expired (delivery date has passed)
+  if (isOrderExpired(order.delivery_date)) return false;
+  
+  return true;
+};

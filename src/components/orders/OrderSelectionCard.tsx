@@ -1,7 +1,8 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { User, Calendar, MapPin } from 'lucide-react';
+import { User, Calendar, MapPin, Clock } from 'lucide-react';
 import { Order } from '@/types/order';
 import { 
   getStatusColor, 
@@ -9,7 +10,9 @@ import {
   getStatusText, 
   getPaymentStatusText,
   formatPrice,
-  formatDate 
+  formatDate,
+  isOrderExpired,
+  canPayOrder
 } from '@/utils/orderUtils';
 
 interface OrderSelectionCardProps {
@@ -25,10 +28,12 @@ export const OrderSelectionCard = ({
   onSelectionChange,
   isDisabled = false 
 }: OrderSelectionCardProps) => {
-  const canSelect = order.payment_status === 'pending' && !isDisabled;
+  const orderExpired = isOrderExpired(order.delivery_date);
+  const canPay = canPayOrder(order);
+  const canSelect = canPay && !isDisabled;
 
   return (
-    <Card className={`hover:shadow-lg transition-shadow ${isSelected ? 'ring-2 ring-orange-500' : ''} ${!canSelect ? 'opacity-50' : ''}`}>
+    <Card className={`hover:shadow-lg transition-shadow ${isSelected ? 'ring-2 ring-orange-500' : ''} ${!canSelect ? 'opacity-50' : ''} ${orderExpired ? 'border-red-200' : ''}`}>
       <CardHeader>
         <div className="flex justify-between items-start">
           <div className="flex items-start space-x-3">
@@ -48,9 +53,15 @@ export const OrderSelectionCard = ({
                   <span>Kelas {order.child_class}</span>
                 </div>
                 {order.delivery_date && (
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className={`flex items-center text-sm ${orderExpired ? 'text-red-600' : 'text-gray-600'}`}>
                     <Calendar className="h-4 w-4 mr-1" />
                     Tanggal Pengiriman: {formatDate(order.delivery_date)}
+                    {orderExpired && (
+                      <Badge variant="destructive" className="ml-2 text-xs">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Kadaluarsa
+                      </Badge>
+                    )}
                   </div>
                 )}
                 <div className="flex items-center text-sm text-gray-600">
@@ -112,7 +123,16 @@ export const OrderSelectionCard = ({
             </div>
           </div>
 
-          {!canSelect && order.payment_status !== 'pending' && (
+          {/* Status Messages */}
+          {orderExpired && (
+            <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-xs text-red-800 text-center">
+                Pesanan kadaluarsa - tidak dapat dibayar
+              </p>
+            </div>
+          )}
+          
+          {!canSelect && !orderExpired && order.payment_status !== 'pending' && (
             <p className="text-xs text-gray-500 text-center">
               Pesanan ini sudah dibayar atau tidak dapat dipilih untuk pembayaran batch
             </p>

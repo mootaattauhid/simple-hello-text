@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
+import { canPayOrder } from '@/utils/orderUtils';
 
 interface OrderItem {
   id: string;
@@ -93,6 +94,16 @@ export const useOrders = () => {
   const retryPayment = async (order: Order) => {
     try {
       console.log('useOrders: Retry payment for order:', order.id, 'midtrans_order_id:', order.midtrans_order_id);
+      
+      // Check if order can be paid before proceeding
+      if (!canPayOrder(order)) {
+        toast({
+          title: "Tidak Dapat Dibayar",
+          description: "Pesanan ini sudah kadaluarsa atau sudah dibayar",
+          variant: "destructive",
+        });
+        return;
+      }
       
       // If snap_token exists, use it directly
       if (order.snap_token) {

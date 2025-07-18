@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, CheckSquare } from 'lucide-react';
+import { canPayOrder } from '@/utils/orderUtils';
 
 const Orders = () => {
   const { orders, loading, retryPayment } = useOrders();
@@ -38,8 +39,10 @@ const Orders = () => {
 
   const filteredOrders = getFilteredOrders();
 
-  // Get pending orders for batch payment
-  const pendingOrders = orders.filter(order => order.payment_status === 'pending');
+  // Get pending orders that can still be paid (not expired)
+  const pendingOrders = orders.filter(order => 
+    order.payment_status === 'pending' && canPayOrder(order)
+  );
 
   const handleSelectionChange = (orderId: string, selected: boolean) => {
     setSelectedOrderIds(prev => 
@@ -88,13 +91,13 @@ const Orders = () => {
       return;
     }
 
-    // Verify all selected orders have pending payment status
-    const invalidOrders = selectedOrders.filter(order => order.payment_status !== 'pending');
+    // Verify all selected orders can be paid (not expired and pending payment)
+    const invalidOrders = selectedOrders.filter(order => !canPayOrder(order));
     if (invalidOrders.length > 0) {
-      console.error('Orders: Some selected orders are not pending:', invalidOrders);
+      console.error('Orders: Some selected orders cannot be paid:', invalidOrders);
       toast({
         title: "Error",
-        description: `${invalidOrders.length} pesanan tidak dapat dibayar karena statusnya bukan pending`,
+        description: `${invalidOrders.length} pesanan tidak dapat dibayar karena sudah kadaluarsa atau sudah dibayar`,
         variant: "destructive",
       });
       return;
@@ -120,6 +123,19 @@ const Orders = () => {
         variant: "destructive",
       });
     }
+  };
+
+  // Custom retry payment with expiration check
+  const handleRetryPayment = (order: any) => {
+    if (!canPayOrder(order)) {
+      toast({
+        title: "Tidak Dapat Dibayar",
+        description: "Pesanan ini sudah kadaluarsa atau sudah dibayar",
+        variant: "destructive",
+      });
+      return;
+    }
+    retryPayment(order);
   };
 
   // Pagination
@@ -221,6 +237,9 @@ const Orders = () => {
                     <p className="text-sm text-blue-800">
                       Mode pemilihan aktif. Pilih pesanan yang ingin dibayar sekaligus, 
                       lalu klik "Bayar Terpilih" untuk melanjutkan ke pembayaran batch.
+                      <span className="block mt-1 text-xs">
+                        <strong>Catatan:</strong> Pesanan yang sudah lewat tanggal katering tidak dapat dibayar.
+                      </span>
                     </p>
                   </div>
                 )}
@@ -252,7 +271,7 @@ const Orders = () => {
               {/* Normal View */}
               <OrderFilters 
                 orders={paginatedOrders} 
-                onRetryPayment={retryPayment}
+                onRetryPayment={handleRetryPayment}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
               />
