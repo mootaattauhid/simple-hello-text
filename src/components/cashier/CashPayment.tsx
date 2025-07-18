@@ -9,6 +9,8 @@ import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPrice } from '@/utils/orderUtils';
 import { Calculator, CreditCard } from 'lucide-react';
+import { PrintButton } from '@/components/ui/print-button';
+import { CashPaymentReceipt } from './CashPaymentReceipt';
 
 interface Order {
   id: string;
@@ -16,6 +18,8 @@ interface Order {
   child_class: string;
   total_amount: number;
   payment_status: string;
+  delivery_date: string;
+  created_at: string;
   order_items: {
     quantity: number;
     price: number;
@@ -34,10 +38,17 @@ export const CashPayment: React.FC<CashPaymentProps> = ({ order, onPaymentComple
   const [receivedAmount, setReceivedAmount] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+  const [paymentCompleted, setPaymentCompleted] = useState(false);
 
   const receivedAmountNumber = parseFloat(receivedAmount) || 0;
   const changeAmount = receivedAmountNumber - order.total_amount;
   const isValidPayment = receivedAmountNumber >= order.total_amount;
+
+  const { handlePrint } = CashPaymentReceipt({ 
+    order, 
+    receivedAmount: receivedAmountNumber, 
+    changeAmount: Math.max(0, changeAmount) 
+  });
 
   const handlePayment = async () => {
     if (!isValidPayment) {
@@ -115,12 +126,14 @@ export const CashPayment: React.FC<CashPaymentProps> = ({ order, onPaymentComple
         }
       }
 
+      setPaymentCompleted(true);
+
       toast({
         title: "Pembayaran Berhasil",
         description: `Pembayaran tunai telah diproses. Kembalian: ${formatPrice(Math.max(0, changeAmount))}`,
       });
 
-      onPaymentComplete();
+      // Don't call onPaymentComplete immediately to allow printing
     } catch (error) {
       console.error('CashPayment: Error processing payment:', error);
       toast({
@@ -131,6 +144,22 @@ export const CashPayment: React.FC<CashPaymentProps> = ({ order, onPaymentComple
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePrintReceipt = (printerType?: string) => {
+    if (paymentCompleted) {
+      const receiptHandler = CashPaymentReceipt({ 
+        order, 
+        receivedAmount: receivedAmountNumber, 
+        changeAmount: Math.max(0, changeAmount),
+        printerType 
+      });
+      receiptHandler.handlePrint();
+    }
+  };
+
+  const handleFinish = () => {
+    onPaymentComplete();
   };
 
   return (
@@ -172,59 +201,99 @@ export const CashPayment: React.FC<CashPaymentProps> = ({ order, onPaymentComple
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Jumlah Uang Diterima
-            </label>
-            <Input
-              type="number"
-              value={receivedAmount}
-              onChange={(e) => setReceivedAmount(e.target.value)}
-              placeholder="Masukkan jumlah uang"
-              min={order.total_amount}
-              step="1000"
-            />
-          </div>
-
-          {receivedAmount && receivedAmountNumber > 0 && (
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="font-medium">Kembalian:</span>
-                <span className={`text-lg font-bold ${changeAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatPrice(Math.max(0, changeAmount))}
-                </span>
+        {!paymentCompleted ? (
+          <>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Jumlah Uang Diterima
+                </label>
+                <Input
+                  type="number"
+                  value={receivedAmount}
+                  onChange={(e) => setReceivedAmount(e.target.value)}
+                  placeholder="Masukkan jumlah uang"
+                  min={order.total_amount}
+                  step="1000"
+                />
               </div>
-              {changeAmount < 0 && (
-                <p className="text-red-600 text-sm mt-1">
-                  Kurang: {formatPrice(Math.abs(changeAmount))}
-                </p>
+
+              {receivedAmount && receivedAmountNumber > 0 && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Kembalian:</span>
+                    <span className={`text-lg font-bold ${changeAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatPrice(Math.max(0, changeAmount))}
+                    </span>
+                  </div>
+                  {changeAmount < 0 && (
+                    <p className="text-red-600 text-sm mt-1">
+                      Kurang: {formatPrice(Math.abs(changeAmount))}
+                    </p>
+                  )}
+                </div>
               )}
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Catatan (Opsional)
+                </label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Catatan tambahan..."
+                  rows={2}
+                />
+              </div>
+
+              <Button
+                onClick={handlePayment}
+                disabled={!isValidPayment || loading}
+                className="w-full"
+                size="lg"
+              >
+                <Calculator className="h-4 w-4 mr-2" />
+                {loading ? 'Memproses...' : 'Proses Pembayaran'}
+              </Button>
             </div>
-          )}
+          </>
+        ) : (
+          <div className="space-y-4">
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-medium text-green-800">Pembayaran Berhasil!</span>
+                <Badge className="bg-green-100 text-green-800">Lunas</Badge>
+              </div>
+              <div className="text-sm text-green-700">
+                <div className="flex justify-between">
+                  <span>Uang Diterima:</span>
+                  <span>{formatPrice(receivedAmountNumber)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Kembalian:</span>
+                  <span>{formatPrice(Math.max(0, changeAmount))}</span>
+                </div>
+              </div>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Catatan (Opsional)
-            </label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Catatan tambahan..."
-              rows={2}
-            />
+            <div className="flex flex-col gap-3">
+              <PrintButton
+                onPrint={handlePrintReceipt}
+                label="Cetak Kwitansi"
+                showPrinterOptions={true}
+                className="w-full"
+              />
+              
+              <Button
+                onClick={handleFinish}
+                variant="outline"
+                className="w-full"
+              >
+                Selesai
+              </Button>
+            </div>
           </div>
-
-          <Button
-            onClick={handlePayment}
-            disabled={!isValidPayment || loading}
-            className="w-full"
-            size="lg"
-          >
-            <Calculator className="h-4 w-4 mr-2" />
-            {loading ? 'Memproses...' : 'Proses Pembayaran'}
-          </Button>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

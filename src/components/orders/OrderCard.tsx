@@ -2,7 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { User, Calendar, MapPin, Clock } from 'lucide-react';
+import { User, Calendar, MapPin, Clock, Download } from 'lucide-react';
 import { Order } from '@/types/order';
 import { 
   getStatusColor, 
@@ -14,6 +14,7 @@ import {
   isOrderExpired,
   canPayOrder
 } from '@/utils/orderUtils';
+import { InvoicePDF } from './InvoicePDF';
 
 interface OrderCardProps {
   order: Order;
@@ -23,6 +24,7 @@ interface OrderCardProps {
 export const OrderCard = ({ order, onRetryPayment }: OrderCardProps) => {
   const orderExpired = isOrderExpired(order.delivery_date);
   const canPay = canPayOrder(order);
+  const { handleDownloadPDF } = InvoicePDF({ order });
 
   return (
     <Card className={`hover:shadow-lg transition-shadow ${orderExpired ? 'opacity-75 border-red-200' : ''}`}>
@@ -136,21 +138,34 @@ export const OrderCard = ({ order, onRetryPayment }: OrderCardProps) => {
             </div>
           )}
 
-          {/* Payment Button */}
-          {order.payment_status === 'pending' && (
+          {/* Action Buttons */}
+          <div className="space-y-2">
+            {/* Payment Button */}
+            {order.payment_status === 'pending' && (
+              <Button 
+                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                onClick={() => onRetryPayment(order)}
+                disabled={!canPay}
+              >
+                {orderExpired 
+                  ? 'Tidak Dapat Dibayar (Kadaluarsa)' 
+                  : order.midtrans_order_id 
+                    ? 'Lanjutkan Pembayaran' 
+                    : 'Bayar Sekarang'
+                }
+              </Button>
+            )}
+
+            {/* Download Invoice Button */}
             <Button 
-              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-              onClick={() => onRetryPayment(order)}
-              disabled={!canPay}
+              variant="outline"
+              className="w-full"
+              onClick={handleDownloadPDF}
             >
-              {orderExpired 
-                ? 'Tidak Dapat Dibayar (Kadaluarsa)' 
-                : order.midtrans_order_id 
-                  ? 'Lanjutkan Pembayaran' 
-                  : 'Bayar Sekarang'
-              }
+              <Download className="h-4 w-4 mr-2" />
+              Download Invoice PDF
             </Button>
-          )}
+          </div>
         </div>
       </CardContent>
     </Card>
