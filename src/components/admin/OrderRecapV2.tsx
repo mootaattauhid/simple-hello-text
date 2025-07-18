@@ -27,6 +27,7 @@ interface RecapV2Data {
   menu_name: string;
   quantity: number;
   payment_status: string;
+  delivery_date: string;
   created_at: string;
 }
 
@@ -84,6 +85,7 @@ export const OrderRecapV2 = ({ onExportData }: OrderRecapV2Props) => {
           child_name,
           child_class,
           payment_status,
+          delivery_date,
           created_at,
           order_items (
             quantity,
@@ -93,7 +95,8 @@ export const OrderRecapV2 = ({ onExportData }: OrderRecapV2Props) => {
           )
         `)
         .not('child_name', 'is', null)
-        .order('created_at', { ascending: false });
+        .not('delivery_date', 'is', null)
+        .order('delivery_date', { ascending: false });
 
       // Apply class filter
       if (selectedClass !== 'all') {
@@ -105,17 +108,17 @@ export const OrderRecapV2 = ({ onExportData }: OrderRecapV2Props) => {
         query = query.eq('payment_status', selectedPaymentStatus);
       }
 
-      // Apply date filters
+      // Apply delivery date filters
       if (startDate) {
         const startOfDay = new Date(startDate);
         startOfDay.setHours(0, 0, 0, 0);
-        query = query.gte('created_at', startOfDay.toISOString());
+        query = query.gte('delivery_date', startOfDay.toISOString().split('T')[0]);
       }
 
       if (endDate) {
         const endOfDay = new Date(endDate);
         endOfDay.setHours(23, 59, 59, 999);
-        query = query.lte('created_at', endOfDay.toISOString());
+        query = query.lte('delivery_date', endOfDay.toISOString().split('T')[0]);
       }
 
       const { data: ordersData, error } = await query;
@@ -133,6 +136,7 @@ export const OrderRecapV2 = ({ onExportData }: OrderRecapV2Props) => {
             menu_name: item.menu_items?.name || 'Unknown Item',
             quantity: item.quantity,
             payment_status: order.payment_status || 'pending',
+            delivery_date: order.delivery_date,
             created_at: order.created_at
           });
         });
@@ -190,7 +194,7 @@ export const OrderRecapV2 = ({ onExportData }: OrderRecapV2Props) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Filter className="h-5 w-5" />
-          Rekapitulasi v2 - Detail Per Siswa
+          Rekapitulasi v2 - Detail Per Siswa (Berdasarkan Tanggal Katering)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -233,7 +237,7 @@ export const OrderRecapV2 = ({ onExportData }: OrderRecapV2Props) => {
 
           {/* Start Date Filter */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Tanggal Mulai</label>
+            <label className="text-sm font-medium">Tanggal Katering Mulai</label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -261,7 +265,7 @@ export const OrderRecapV2 = ({ onExportData }: OrderRecapV2Props) => {
 
           {/* End Date Filter */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Tanggal Akhir</label>
+            <label className="text-sm font-medium">Tanggal Katering Akhir</label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -309,7 +313,7 @@ export const OrderRecapV2 = ({ onExportData }: OrderRecapV2Props) => {
               Menampilkan {data.length} item
               {selectedClass !== 'all' && ` untuk kelas ${selectedClass}`}
               {selectedPaymentStatus !== 'all' && ` dengan status ${getPaymentStatusLabel(selectedPaymentStatus)}`}
-              {startDate && ` dari ${format(startDate, "dd/MM/yyyy")}`}
+              {startDate && ` dari tanggal katering ${format(startDate, "dd/MM/yyyy")}`}
               {endDate && ` sampai ${format(endDate, "dd/MM/yyyy")}`}
             </p>
           </div>
@@ -326,7 +330,7 @@ export const OrderRecapV2 = ({ onExportData }: OrderRecapV2Props) => {
                 <TableHead>Nama Menu</TableHead>
                 <TableHead className="text-center">Quantity</TableHead>
                 <TableHead>Status Bayar</TableHead>
-                <TableHead>Tanggal</TableHead>
+                <TableHead>Tanggal Katering</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -360,7 +364,7 @@ export const OrderRecapV2 = ({ onExportData }: OrderRecapV2Props) => {
                         {getPaymentStatusLabel(item.payment_status)}
                       </span>
                     </TableCell>
-                    <TableCell>{formatDate(item.created_at)}</TableCell>
+                    <TableCell>{formatDate(item.delivery_date)}</TableCell>
                   </TableRow>
                 ))
               )}

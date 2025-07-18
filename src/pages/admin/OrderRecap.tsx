@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ interface OrderRecapData {
   child_class: string;
   total_amount: number;
   created_at: string;
+  delivery_date: string;
   order_items: {
     id: string;
     quantity: number;
@@ -61,19 +63,21 @@ const OrderRecap = () => {
     
     if (startDate) {
       filtered = filtered.filter(order => {
-        const orderDate = new Date(order.created_at);
+        if (!order.delivery_date) return false;
+        const deliveryDate = new Date(order.delivery_date);
         const startOfDay = new Date(startDate);
         startOfDay.setHours(0, 0, 0, 0);
-        return orderDate >= startOfDay;
+        return deliveryDate >= startOfDay;
       });
     }
     
     if (endDate) {
       filtered = filtered.filter(order => {
-        const orderDate = new Date(order.created_at);
+        if (!order.delivery_date) return false;
+        const deliveryDate = new Date(order.delivery_date);
         const endOfDay = new Date(endDate);
         endOfDay.setHours(23, 59, 59, 999);
-        return orderDate <= endOfDay;
+        return deliveryDate <= endOfDay;
       });
     }
     
@@ -96,6 +100,7 @@ const OrderRecap = () => {
           child_class,
           total_amount,
           created_at,
+          delivery_date,
           order_items (
             id,
             quantity,
@@ -105,7 +110,8 @@ const OrderRecap = () => {
             )
           )
         `)
-        .order('created_at', { ascending: false });
+        .not('delivery_date', 'is', null)
+        .order('delivery_date', { ascending: false });
 
       if (error) throw error;
       
@@ -150,9 +156,9 @@ const OrderRecap = () => {
 
     setGroupedMenuItems(grouped);
 
-    // Process orders by date
+    // Process orders by delivery date
     const byDate = orderData.reduce((acc, order) => {
-      const date = formatDate(order.created_at);
+      const date = order.delivery_date ? formatDate(order.delivery_date) : 'Tanpa Tanggal';
       if (!acc[date]) {
         acc[date] = [];
       }
@@ -200,7 +206,6 @@ const OrderRecap = () => {
       }))
     );
 
-    // Group by menu name and sum quantities
     const groupedMenuItems = allMenuItems.reduce((acc, item) => {
       const existing = acc.find(i => i.name === item.name);
       if (existing) {
@@ -216,7 +221,6 @@ const OrderRecap = () => {
       return acc;
     }, [] as { name: string; quantity: number; totalPrice: number }[]);
 
-    // Group by class
     const ordersByClass = dataToUse.reduce((acc, order) => {
       if (!acc[order.child_class]) {
         acc[order.child_class] = [];
@@ -226,7 +230,7 @@ const OrderRecap = () => {
     }, {} as Record<string, OrderRecapData[]>);
 
     const filterInfo = (startDate || endDate) ? 
-      `<p style="color: #666;">Filter: ${startDate ? format(startDate, "dd/MM/yyyy") : 'Semua'} - ${endDate ? format(endDate, "dd/MM/yyyy") : 'Semua'}</p>` : 
+      `<p style="color: #666;">Filter Tanggal Katering: ${startDate ? format(startDate, "dd/MM/yyyy") : 'Semua'} - ${endDate ? format(endDate, "dd/MM/yyyy") : 'Semua'}</p>` : 
       '';
 
     return `
@@ -388,7 +392,7 @@ const OrderRecap = () => {
                   <th>Nama Menu</th>
                   <th style="text-align: center;">Quantity</th>
                   <th>Status Bayar</th>
-                  <th>Tanggal</th>
+                  <th>Tanggal Katering</th>
                 </tr>
               </thead>
               <tbody>
@@ -400,7 +404,7 @@ const OrderRecap = () => {
                     <td>${item.menu_name}</td>
                     <td style="text-align: center;">${item.quantity}</td>
                     <td>${item.payment_status === 'paid' ? 'Lunas' : item.payment_status === 'pending' ? 'Belum Bayar' : item.payment_status}</td>
-                    <td>${formatDate(item.created_at)}</td>
+                    <td>${item.delivery_date ? formatDate(item.delivery_date) : 'Tidak ada'}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -467,7 +471,7 @@ const OrderRecap = () => {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent mb-2">
             Rekap Pesanan
           </h1>
-          <p className="text-gray-600">Ringkasan pesanan yang masuk</p>
+          <p className="text-gray-600">Ringkasan pesanan berdasarkan tanggal katering</p>
         </div>
         <div className="flex gap-4 items-center">
           <PrintButton onPrint={handlePrint} />
@@ -492,13 +496,16 @@ const OrderRecap = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Filter className="h-5 w-5" />
-                Filter Tanggal
+                Filter Tanggal Katering
               </CardTitle>
+              <CardDescription>
+                Filter berdasarkan tanggal pengantaran katering
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">Tanggal Mulai</label>
+                  <label className="text-sm font-medium">Tanggal Katering Mulai</label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -509,7 +516,7 @@ const OrderRecap = () => {
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {startDate ? format(startDate, "PPP") : <span>Pilih tanggal</span>}
+                        {startDate ? format(startDate, "dd/MM/yyyy") : <span>Pilih tanggal</span>}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -525,7 +532,7 @@ const OrderRecap = () => {
                 </div>
                 
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">Tanggal Akhir</label>
+                  <label className="text-sm font-medium">Tanggal Katering Akhir</label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -536,7 +543,7 @@ const OrderRecap = () => {
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {endDate ? format(endDate, "PPP") : <span>Pilih tanggal</span>}
+                        {endDate ? format(endDate, "dd/MM/yyyy") : <span>Pilih tanggal</span>}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -566,7 +573,7 @@ const OrderRecap = () => {
               {(startDate || endDate) && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-700">
-                    Menampilkan {filteredOrders.length} pesanan
+                    Menampilkan {filteredOrders.length} pesanan dengan tanggal katering
                     {startDate && ` dari ${format(startDate, "dd/MM/yyyy")}`}
                     {endDate && ` sampai ${format(endDate, "dd/MM/yyyy")}`}
                   </p>
@@ -617,10 +624,10 @@ const OrderRecap = () => {
             </CardContent>
           </Card>
 
-          {/* Rekapitulasi per Tanggal */}
+          {/* Rekapitulasi per Tanggal Katering */}
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Rekapitulasi per Tanggal</CardTitle>
+              <CardTitle>Rekapitulasi per Tanggal Katering</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -650,7 +657,7 @@ const OrderRecap = () => {
 
                   return (
                     <div key={date} className="border rounded-lg p-4">
-                      <h3 className="font-bold text-lg mb-3">{date}</h3>
+                      <h3 className="font-bold text-lg mb-3">Tanggal Katering: {date}</h3>
                       <div className="overflow-x-auto">
                         <table className="min-w-full border-collapse border border-gray-300">
                           <thead>
@@ -761,7 +768,6 @@ const OrderRecap = () => {
             </CardContent>
           </Card>
 
-          {/* Detail Pesanan Individual */}
           <Card>
             <CardHeader>
               <CardTitle>Detail Pesanan Individual</CardTitle>
@@ -773,7 +779,7 @@ const OrderRecap = () => {
                     <CardHeader>
                       <CardTitle>{order.child_name}</CardTitle>
                       <CardDescription>
-                        Kelas {order.child_class} • {formatDate(order.created_at)}
+                        Kelas {order.child_class} • Katering: {order.delivery_date ? formatDate(order.delivery_date) : 'Belum dijadwalkan'}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
